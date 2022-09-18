@@ -1,10 +1,23 @@
-import logging
-import os
-import discord
-
-from discord_slash import ButtonStyle, ComponentMessage
+from discord_slash import ButtonStyle
 from discord_slash.utils.manage_components import create_actionrow, create_button
-import aiofiles
+
+WL = ["win", "draw", "loss"]
+
+ROLE = [
+    "tank",
+    "damage",
+    "support"
+]
+
+QUAL = [
+    "i should uninstall",
+    "bad",
+    "mediocre",
+    "ok",
+    "decent",
+    "gg!",
+    "overwatch is actually good"
+]
 
 def make_map_buttons():
     row_1 = [
@@ -45,31 +58,31 @@ def make_map_buttons():
 
 def make_winloss_buttons(prefix: str):
     options = [
-        create_button(style=ButtonStyle.green, label="win",  custom_id=prefix + "w"),
-        create_button(style=ButtonStyle.grey,  label="draw", custom_id=prefix + "x"),
-        create_button(style=ButtonStyle.red,   label="loss", custom_id=prefix + "l"),
+        create_button(style=ButtonStyle.green, label=WL[0], custom_id=prefix + "w"),
+        create_button(style=ButtonStyle.grey,  label=WL[1], custom_id=prefix + "x"),
+        create_button(style=ButtonStyle.red,   label=WL[2], custom_id=prefix + "l"),
     ]
     return create_actionrow(*options), [option["custom_id"] for option in options] 
 
 def make_role_buttons(prefix: str):
     options = [
-        create_button(style=ButtonStyle.gray, label="tank",    custom_id=prefix + "t"),
-        create_button(style=ButtonStyle.gray, label="damage",  custom_id=prefix + "d"),
-        create_button(style=ButtonStyle.gray, label="support", custom_id=prefix + "s"),
+        create_button(style=ButtonStyle.gray, label=ROLE[0], custom_id=prefix + "t"),
+        create_button(style=ButtonStyle.gray, label=ROLE[1], custom_id=prefix + "d"),
+        create_button(style=ButtonStyle.gray, label=ROLE[2], custom_id=prefix + "s"),
     ]
     return create_actionrow(*options), [option["custom_id"] for option in options]
 
 def make_quality_buttons(prefix: str):
     options = [
-        create_button(style=ButtonStyle.green, label="gg!",     custom_id=prefix + "5"),
-        create_button(style=ButtonStyle.gray,  label="decent",   custom_id=prefix + "4"),
-        create_button(style=ButtonStyle.gray,  label="ok",     custom_id=prefix + "3"),
-        create_button(style=ButtonStyle.gray,  label="mediocre", custom_id=prefix + "2"),
-        create_button(style=ButtonStyle.red,   label="bad",      custom_id=prefix + "1"),
+        create_button(style=ButtonStyle.green, label=QUAL[5], custom_id=prefix + "5"),
+        create_button(style=ButtonStyle.gray,  label=QUAL[4], custom_id=prefix + "4"),
+        create_button(style=ButtonStyle.gray,  label=QUAL[3], custom_id=prefix + "3"),
+        create_button(style=ButtonStyle.gray,  label=QUAL[2], custom_id=prefix + "2"),
+        create_button(style=ButtonStyle.red,   label=QUAL[1], custom_id=prefix + "1"),
     ]
     options2 = [
-        create_button(style=ButtonStyle.green, label="overwatch is actually good", custom_id=prefix + "6"),
-        create_button(style=ButtonStyle.red,   label="i should uninstall",         custom_id=prefix + "0")
+        create_button(style=ButtonStyle.green, label=QUAL[6], custom_id=prefix + "6"),
+        create_button(style=ButtonStyle.red,   label=QUAL[0], custom_id=prefix + "0")
     ]
     return create_actionrow(*options), create_actionrow(*options2), \
         [option["custom_id"] for option in options] + [option["custom_id"] for option in options2]
@@ -81,30 +94,7 @@ def make_submit_button(prefix: str):
     return create_actionrow(*options), [option["custom_id"] for option in options] 
 
 
-
-async def write_line(*args):
-    if os.path.exists("data.csv"):
-        size = os.path.getsize("data.csv")
-        if size:
-            async with aiofiles.open("data.csv", mode="a") as file:
-                await file.write(",".join(map(str, args)) + "\n")
-            return
-
-    async with aiofiles.open("data.csv", mode="w") as file:
-        await file.write("author,map,win/loss,role,sentiment,time\n")
-        await file.write(",".join(map(str, args)) + "\n")
-
-async def remove_last_line():
-    if os.path.exists("data.csv"):
-        async with aiofiles.open("data.csv", mode="r") as file:
-            lines = await file.readlines()
-        async with aiofiles.open("data.csv", mode="w") as file:
-            await file.writelines(lines[:-1])
-            return lines[-1]
-
-async def get_line_count():
-    if os.path.exists("data.csv"):
-        async with aiofiles.open("data.csv", mode="r") as file:
-            lines = await file.readlines()
-            return len(lines)
-    return -1
+def make_last_undo_button(btn_id: str, count):
+    label = "Delete rows" if count != 1 else "Delete row"
+    button = create_button(style=ButtonStyle.red, label=label, custom_id=btn_id)
+    return create_actionrow(button)

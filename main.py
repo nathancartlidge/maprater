@@ -1,6 +1,4 @@
-from heapq import heapify
 import os
-from re import sub
 import time
 import asyncio
 import logging
@@ -13,11 +11,13 @@ from discord_slash.utils.manage_commands import create_option
 from dotenv import load_dotenv
 from datetime import datetime as dt
 
-from embed_handler import make_map_buttons, write_line, make_quality_buttons, make_role_buttons
-from embed_handler import make_submit_button, make_winloss_buttons, remove_last_line, get_line_count
+from embed_handler import make_map_buttons, make_quality_buttons, make_role_buttons
+from embed_handler import make_submit_button, make_winloss_buttons, make_last_undo_button
+
+from file_handler import write_line, delete_last, get_last, get_line_count
 
 # Initialise a bot object with a command prefix
-bot = commands.Bot()
+bot = commands.Bot(command_prefix="/")
 slash = SlashCommand(bot, sync_commands=True)
 
 MAPS = [
@@ -32,9 +32,20 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game(name="the worst ow maps"))
     logging.info('Bot started')
 
+# @bot.event
+# async def on_voice_state_update(member: discord.Member, before: discord.VoiceState,
+#                                 after: discord.VoiceState):
+#     joined_channel = before.channel is None and after.channel is not None
+#     if joined_channel:
+#         logging.info("%s",  after.channel.name)
+#         await asyncio.sleep(10)
+#         still_in_voice = member.voice is not None and member.voice.channel is not None
+#         if still_in_voice:
+#             ...
+#             logging.info("%s", member.voice is not None)
 
 @slash.slash(name="make_buttons",
-             description="Create map rating buttons")
+             description="Create map rating buttons in a channel - can only be run once")
 async def make_buttons(ctx: SlashContext):
     logging.info("Created Buttons")
 
@@ -49,16 +60,24 @@ async def get_data(ctx: SlashContext):
     else:
         await ctx.send(":/ No file found?")
 
-@slash.slash(name="undo",
-             description="Remove the last line from the file")
-async def undo(ctx: ComponentContext):
-    logging.info("removing last line")
-    line = await remove_last_line()
-    if line is None:
-        await ctx.reply(":/ No file found, unable to delete", hidden=True)
-    else:
-        await ctx.reply(f"Removed line: `{repr(line)}`", hidden=True)
-        logging.info("removed line: %s", repr(line))
+@slash.slash(name="last", description="get the last n rows", options=[
+    create_option(name="count", description="number of entries to return",
+                  option_type=int, required=False)
+])
+async def last(ctx: SlashContext, count: int = 1):
+    lines = await get_last(count)
+    btn_id = str(time.monotonic())
+    arow = make_last_undo_button(btn_id, count)
+    await ctx.send(f"```{''.join(lines)}```", components=[arow], hidden=True)
+
+    @slash.component_callback(components=[btn_id])
+    async def delete_last_cb(subctx: ComponentContext):
+        logging.info("deleted row(s): %s", lines)
+        await delete_last(count)
+        await subctx.edit_origin(
+            content=f"```{''.join(lines)}```*successfully deleted*",
+            components=[]
+        )
 
 @slash.component_callback(components=MAPS)
 async def button_press(ctx: ComponentContext, ttl=60):
@@ -83,7 +102,6 @@ async def button_press(ctx: ComponentContext, ttl=60):
     @slash.component_callback(components=bi1)
     async def winloss_press(subctx: ComponentContext):
         winloss = subctx.component_id[-1]
-        logging.info(f"{ow_map} - {subctx.author} - {winloss}")
 
         if str(subctx.author) not in data:
             data[str(subctx.author)] = {}
@@ -94,7 +112,6 @@ async def button_press(ctx: ComponentContext, ttl=60):
     @slash.component_callback(components=bi2)
     async def role_press(subctx: ComponentContext):
         role = subctx.component_id[-1]
-        logging.info(f"{ow_map} - {subctx.author} - {role}")
 
         if str(subctx.author) not in data:
             data[str(subctx.author)] = {}
@@ -105,7 +122,6 @@ async def button_press(ctx: ComponentContext, ttl=60):
     @slash.component_callback(components=bi3)
     async def quality_press(subctx: ComponentContext):
         sentiment = subctx.component_id[-1]
-        logging.info(f"{ow_map} - {subctx.author} - {sentiment}")
 
         if str(subctx.author) not in data:
             data[str(subctx.author)] = {}
@@ -129,8 +145,9 @@ async def button_press(ctx: ComponentContext, ttl=60):
             await subctx.defer(ignore=True, hidden=True)
             return
 
+        logging.info("%s voted: %s %s %s %s", subctx.author, ow_map, winloss, role, sentiment)
         await write_line(subctx.author, ow_map, winloss, role, sentiment, dt.now().isoformat())
-        
+
         has_voted.append(str(subctx.author))
         voters_line = ", ".join(map(lambda f: f.split("#")[0], has_voted))
 
@@ -150,7 +167,7 @@ if __name__ == "__main__":
 
     # Load in the Discord API key from your .env
     load_dotenv()
-    TOKEN = os.getenv("DISCORD_TOKEN")
+    TOKEN = os.getenv('DISCORD_TOKEN')
 
     # Start the bot using the API key
     slash.sync_all_commands()
