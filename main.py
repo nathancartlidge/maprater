@@ -16,6 +16,8 @@ from embed_handler import make_submit_button, make_winloss_buttons, make_last_un
 
 from file_handler import write_line, delete_last, get_last, get_line_count
 
+from data_review import get_pandas_data, make_figure
+
 # Initialise a bot object with a command prefix
 bot = commands.Bot(command_prefix="/")
 slash = SlashCommand(bot, sync_commands=True)
@@ -59,6 +61,23 @@ async def get_data(ctx: SlashContext):
         await ctx.send(f"{lines - 1} entries", file=discord.File("data.csv"), hidden=True)
     else:
         await ctx.send(":/ No file found?")
+
+@slash.slash(name="plot_data",
+             description="Plot the current results of the data",
+             options=[
+    create_option(name="wingroup", description="split ratings by win/loss (draw=win)",
+                  option_type=bool, required=False),
+    create_option(name="countplot", description="display count of ratings",
+                  option_type=bool, required=False)
+])
+async def plot_data(ctx: SlashContext, wingroup=False, countplot=False):
+    if (lines := await get_line_count()) <= 1:
+        await ctx.send("Data file is empty - cannot create graphs", hidden=True)
+    else:
+        await ctx.defer(hidden=True)
+        data_pandas = get_pandas_data()
+        figure = make_figure(data_pandas, wingroup, countplot)
+        await ctx.send(f"Results plot for {lines} entries", file=figure, hidden=True)
 
 @slash.slash(name="last", description="get the last n rows", options=[
     create_option(name="count", description="number of entries to return",
