@@ -67,16 +67,20 @@ async def get_data(ctx: SlashContext):
              options=[
     create_option(name="wingroup", description="split ratings by win/loss (draw=win)",
                   option_type=bool, required=False),
+    create_option(name="normalise", description="normalise ratings by win/loss (draw=win)",
+                  option_type=bool, required=False),
     create_option(name="countplot", description="display count of ratings",
                   option_type=bool, required=False)
 ])
-async def plot_data(ctx: SlashContext, wingroup=False, countplot=False):
+async def plot_data(ctx: SlashContext, wingroup=False, normalise=False, countplot=False):
     if (lines := await get_line_count()) <= 1:
         await ctx.send("Data file is empty - cannot create graphs", hidden=True)
     else:
         await ctx.defer(hidden=True)
         data_pandas = get_pandas_data()
-        figure = make_figure(data_pandas, wingroup, countplot)
+        if normalise:
+            wingroup = False
+        figure = make_figure(data_pandas, normalise, wingroup, countplot)
         await ctx.send(f"Results plot for {lines} entries", file=figure, hidden=True)
 
 @slash.slash(name="last", description="get the last n rows", options=[
