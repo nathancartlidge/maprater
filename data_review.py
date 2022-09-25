@@ -1,4 +1,4 @@
-#%%
+# %%
 import io
 from itertools import count
 import pandas as pd
@@ -8,14 +8,12 @@ from discord import File
 
 plt.style.use("dark_background")
 
-# %%
-def get_pandas_data():
-    data = pd.read_csv("data.csv")
+def get_pandas_data(file="/data/data.csv"):
+    data = pd.read_csv(file)
     data["time"] = pd.to_datetime(data["time"])
     data.rename(columns={"win/loss": "winloss"}, inplace=True)
     return data
 
-#%%
 def make_figure(data, normalise=False, wingroup=False, countplot=False, draw_is_loss=False):
     data = data.replace(to_replace="x", value="l" if draw_is_loss else "w")
 
@@ -88,7 +86,8 @@ def make_figure(data, normalise=False, wingroup=False, countplot=False, draw_is_
     buffer.seek(0)
     return File(fp=buffer, filename="graph.png")
 
-#%%
+# %%
+# data = get_pandas_data("data.csv")
 # make_figure(data, normalise=False)
 
 # %%

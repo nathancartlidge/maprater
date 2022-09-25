@@ -13,6 +13,7 @@ from datetime import datetime as dt
 
 from embed_handler import make_map_buttons, make_quality_buttons, make_role_buttons
 from embed_handler import make_submit_button, make_winloss_buttons, make_last_undo_button
+from embed_handler import make_plot_buttons
 
 from file_handler import write_line, delete_last, get_last, get_line_count
 
@@ -58,11 +59,11 @@ async def make_buttons(ctx: SlashContext):
              description="Get raw data")
 async def get_data(ctx: SlashContext):
     if (lines := await get_line_count()) != -1:
-        await ctx.send(f"{lines - 1} entries", file=discord.File("data.csv"), hidden=True)
+        await ctx.send(f"{lines - 1} entries", file=discord.File("/data/data.csv"), hidden=True)
     else:
-        await ctx.send(":/ No file found?")
+        await ctx.send(":/ No file found?", hidden=True)
 
-@slash.slash(name="plot_data",
+@slash.slash(name="make_plot",
              description="Plot the current results of the data",
              options=[
     create_option(name="wingroup", description="split ratings by win/loss (draw=win)",
@@ -71,17 +72,30 @@ async def get_data(ctx: SlashContext):
                   option_type=bool, required=False),
     create_option(name="countplot", description="display count of ratings",
                   option_type=bool, required=False)
+    # create_option(name="hide", description="show in channel",
+    #               option_type=bool, required=False)
 ])
-async def plot_data(ctx: SlashContext, wingroup=False, normalise=False, countplot=False):
+async def plot_data(ctx: SlashContext, wingroup=False, normalise=False, countplot=False, hide=True):
+    logging.debug("plotting")
     if (lines := await get_line_count()) <= 1:
-        await ctx.send("Data file is empty - cannot create graphs", hidden=True)
+        await ctx.send("Data file is empty - cannot create graphs", hidden=hide)
     else:
-        await ctx.defer(hidden=True)
+        await ctx.defer(hidden=hide)
         data_pandas = get_pandas_data()
         if normalise:
             wingroup = False
         figure = make_figure(data_pandas, normalise, wingroup, countplot)
-        await ctx.send(f"Results plot for {lines} entries", file=figure, hidden=True)
+        arow, button = make_plot_buttons()
+        upd = "" if hide else f" (last updated <t:{round(time.time())}:R>)"
+        await ctx.send(f"Results plot for {lines - 1} entries{upd}",
+                       files=[figure], components=None if hide else [arow], hidden=hide)
+
+        @slash.component_callback(components=[button])
+        async def update_plot(subctx: ComponentContext):
+            await subctx.defer(hidden=hide, edit_origin=True)
+            figure = make_figure(data_pandas, normalise, wingroup, countplot)
+            await subctx.edit_origin(content=f"Results plot for {lines - 1} entries (last updated <t:{round(time.time())}:R>)",
+                                     files=[figure], components=None if hide else [arow], hidden=hide)
 
 @slash.slash(name="last", description="get the last n rows", options=[
     create_option(name="count", description="number of entries to return",

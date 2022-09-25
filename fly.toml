@@ -10,8 +10,8 @@ processes = []
   PORT = "8080"
 
 [mounts]
-source="maprater_data"
-destination="/data"
+source = "maprater_data"
+destination = "/data"
 
 [experimental]
   allowed_public_ports = []

@@ -93,6 +93,11 @@ def make_submit_button(prefix: str):
     ]
     return create_actionrow(*options), [option["custom_id"] for option in options] 
 
+def make_plot_buttons():
+    options = [
+        create_button(style=ButtonStyle.grey, label="update plot")
+    ]
+    return create_actionrow(*options), options[0]["custom_id"]
 
 def make_last_undo_button(btn_id: str, count):
     label = "Delete rows" if count != 1 else "Delete row"
