@@ -208,7 +208,7 @@ class VotingButtons(discord.ui.View):
 
         if (user := str(interaction.user)) in self.votes:
             await interaction.response.send_message(
-                content="Error - you have already voted!",
+                content="You have already voted! To remove a vote, use the `/last` command",
                 ephemeral=True
             )
             return
@@ -219,7 +219,7 @@ class VotingButtons(discord.ui.View):
 
         if a is None or b is None or c is None:
             await interaction.response.send_message(
-                content="Error - Not all information included!",
+                content="Please fill in all sections!",
                 ephemeral=True
             )
             return

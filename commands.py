@@ -21,7 +21,7 @@ class BaseCommands(commands.Cog):
         logging.info("Created buttons - Invoked by %s", ctx.author)
         await ctx.respond(
             content="Select a map to vote on:",
-            view=MapButtons()
+            view=MapButtons(self.file_handler)
         )
 
     @slash_command(description="Get raw data")

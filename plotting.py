@@ -20,8 +20,11 @@ PLOT_DESCRIPTION = {
     "group": "Data has been separated by win/loss",
     "ungroup": "Data has not been normalised",
     "count": "Data shows the number of ratings per map, separated by win/loss",
-    "distribution": "Data shows KDE-smoothed plot of ranking distribution, separated by win/loss"
+    "distribution": "Data shows KDE-smoothed plot of ranking distribution, separated by win/loss",
+    "distribution_all": "Data shows KDE-smoothed plot of ranking distribution, separated by voter"
 }
+WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
+
 
 class PlotCommands(commands.Cog):
     def __init__(self, file_handler: FileHandler):
@@ -41,6 +44,10 @@ class PlotCommands(commands.Cog):
         if user is not None:
             # filter data to the user specified
             data = data[data.author == str(user)]
+        else:
+            if mode == "distribution":
+                mode = "distribution_all"
+
 
         if (lines := data.shape[0]) < 1:
             await ctx.respond(
@@ -68,12 +75,17 @@ class PlotCommands(commands.Cog):
             ephemeral=True
         )
 
+        del buffer, figure, aggregate
+
     def _process_data(self, data: pd.DataFrame, mode: str = None,
                       draw_is_loss: bool = False):
         """Converts raw Dataframe to Pandas group-by format"""
         
         data = data.replace(to_replace="x", value="l" if draw_is_loss else "w")
         data = data.replace(to_replace=["w", "l"], value=["Win", "Loss"])
+
+        if mode in ("distribution", "distribution_all"):
+            return data  # No processing needed - not split by map
 
         if mode == "ungroup":
             grouped = data.groupby(["map"])["sentiment"]
@@ -95,7 +107,7 @@ class PlotCommands(commands.Cog):
         agg = agg.sort_values()
         agg = agg.reset_index()
         return agg
-    
+
     @staticmethod
     def _plot_data(agg, mode=None):
         """Converts pandas groupby to matplolib plot image buffer"""
@@ -119,7 +131,7 @@ class PlotCommands(commands.Cog):
                 y="sentiment",
                 ax=ax,
                 hue="winloss",
-                palette=["tab:red", "tab:green"]
+                palette=WINLOSS_PALETTE
             )
         elif mode == "ungroup":
             sns.barplot(
@@ -136,24 +148,51 @@ class PlotCommands(commands.Cog):
                 y="sentiment",
                 ax=ax,
                 hue="winloss",
-                palette=["tab:red", "tab:green"]
+                palette=WINLOSS_PALETTE,
             )
             ax.set_ylabel("Count")
+        elif mode == "distribution":
+            sns.kdeplot(
+                data=agg,
+                x="sentiment",
+                ax=ax,
+                hue="winloss",
+                palette=WINLOSS_PALETTE,
+                fill=True,
+                bw_adjust=1.25
+            )
+        elif mode == "distribution_all":
+            sns.kdeplot(
+                data=agg,
+                x="sentiment",
+                ax=ax,
+                hue="author",
+                fill=True,
+                bw_adjust=1
+            )
         else:
             raise ValueError("Incorrect mode")
 
-        if mode != "count":
+        if mode in ("distribution", "distribution_all"):
+            ax.set_xlim(-1, 7)
+            ax.set_xlabel("Quality")
+        elif mode != "count":
             ax.set_ylim((0, 6))
             ax.set_ylabel("Quality")
 
-        if mode in ("group", "count"):
+        if mode in ("group", "count", "distribution", "distribution_all"):
             legend = ax.get_legend()
-            legend.set_title("Win / Loss")
+            if mode == "distribution_all":
+                legend.set_title("Author")
+            else:
+                legend.set_title("Win / Loss")
             legend.get_frame().set_alpha(0)
 
         sns.despine(ax=ax)
-        ax.tick_params(axis='x', rotation=45)
-        ax.set_xlabel("Map")
+
+        if mode not in ("distribution", "distribution_all"):
+            ax.tick_params(axis='x', rotation=45)
+            ax.set_xlabel("Map")
 
         return fig
 

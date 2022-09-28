@@ -13,8 +13,8 @@ if __name__ == "__main__":
 
     # Load a discord API key from a .env file
     load_dotenv()
-    TOKEN = os.getenv('DISCORD_TOKEN')
-    GUILD = os.getenv('DISCORD_GUILD', None)
+    TOKEN = os.getenv("DISCORD_TOKEN")
+    GUILD = os.getenv("DISCORD_GUILD", None)
 
     file_handler = FileHandler("/data/data.csv")
     bot = MapRater(file_handler=file_handler, debug_guilds=[GUILD])
