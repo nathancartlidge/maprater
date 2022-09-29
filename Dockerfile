@@ -1,6 +1,4 @@
-ARG PYTHON_VERSION=3.10
-
-FROM python:${PYTHON_VERSION}
+FROM python:3.10
 
 RUN apt-get update && apt-get install -y \
     python3-pip \
@@ -17,5 +15,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-# replace APP_NAME with module name
 CMD ["python", "main.py"]
