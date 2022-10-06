@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from bot import MapRater
 from commands import BaseCommands
 from plotting import PlotCommands
-from file_handler import FileHandler
+from db_handler import DatabaseHandler
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
@@ -27,14 +27,14 @@ if __name__ == "__main__":
         TOKEN = os.getenv("DISCORD_TOKEN")
         GUILD = os.getenv("DISCORD_GUILD", None)
 
-    file_handler = FileHandler("/data/ow2_data.csv")
-    bot = MapRater(file_handler=file_handler, debug_guilds=[GUILD])
+    db_handler = DatabaseHandler(root_dir="")
+    bot = MapRater(db_handler=db_handler, debug_guilds=[GUILD])
 
     @bot.slash_command()
     async def ping(ctx):
         await ctx.respond(f"pong! [{round(bot.latency, 2)}s]", ephemeral=True)
 
-    bot.add_cog(BaseCommands(bot.file_handler))
-    bot.add_cog(PlotCommands(bot.file_handler))
+    bot.add_cog(BaseCommands(bot.db_handler))
+    bot.add_cog(PlotCommands(bot.db_handler))
 
     bot.run(TOKEN)

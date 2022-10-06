@@ -1,8 +1,5 @@
 import io
 import logging
-from sys import platlibdir
-
-from typing import Optional
 
 import discord
 import pandas as pd
@@ -13,7 +10,7 @@ import matplotlib.pyplot as plt
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from file_handler import FileHandler
+from db_handler import DatabaseHandler
 
 PLOT_DESCRIPTION = {
     "normalise": "Data has been normalised by winrate (equal weight to ratings given from losses as ratings given from wins)",
@@ -27,8 +24,8 @@ WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
 
 
 class PlotCommands(commands.Cog):
-    def __init__(self, file_handler: FileHandler):
-        self.file_handler = file_handler
+    def __init__(self, db_handler: DatabaseHandler):
+        self.db_handler = db_handler
 
     @slash_command(description="Plot the current data")
     async def plot(self, ctx: discord.context.ApplicationContext,
@@ -38,8 +35,7 @@ class PlotCommands(commands.Cog):
                    user: Option(discord.Member, description="Limit data to a particular person",
                                 required=False, default=None)):
         logging.debug("Creating Plot - Invoked by %s", ctx.author)
-        await self.file_handler.ensure_file_exists()  # prevents issues with deleted file
-        data = self.file_handler.get_pandas_data()
+        data = self.db_handler.get_pandas_data(ctx.guild_id)
 
         if user is not None:
             # filter data to the user specified

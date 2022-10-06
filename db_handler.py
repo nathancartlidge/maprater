@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-import aiofiles
+import sqlite3
 import aiosqlite
 import pandas as pd
 
@@ -40,17 +40,31 @@ CREATE TABLE IF NOT EXISTS ow2 (
 )
 """
 
+SELECT_COUNT = "SELECT COUNT(rating_id) FROM ow2"
+SELECT_ALL = """
+SELECT users.username, maps.map_name, ow2.result, ow2.role, ow2.sentiment,
+       datetime(ow2.datetime, 'unixepoch')
+    FROM ow2
+        INNER JOIN users ON ow2.author_id = users.user_id
+        INNER JOIN maps ON ow2.map_id = maps.map_id 
+"""
 SELECT_LAST_N = lambda n: f"""
-SELECT (users.username, maps.map_name, ow2.result, ow2.role, ow2.sentiment,
-        datetime(ow2.datetime, 'unixepoch'))
+SELECT users.username, maps.map_name, ow2.result, ow2.role, ow2.sentiment,
+       datetime(ow2.datetime, 'unixepoch')
     FROM ow2
         INNER JOIN users ON ow2.author_id = users.user_id
         INNER JOIN maps ON ow2.map_id = maps.map_id 
     ORDER BY rating_id DESC
     LIMIT {min(20, max(1, int(n))):0d};
-"""  # FIXME - join to other things
+"""
 SELECT_USERID_FROM_USERNAME = "SELECT user_id FROM users WHERE username = ?"
 SELECT_MAPID_FROM_MAPNAME = "SELECT map_id FROM maps WHERE map_name = ?"
+
+DELETE_N_IDS = lambda n: f"""
+SELECT * FROM ow2
+    WHERE rating_id IN
+        ({', '.join(['?'*n])})
+"""
 
 INSERT_INTO_DATA = """
 INSERT INTO ow2
@@ -61,130 +75,132 @@ INSERT_INTO_USERS = "INSERT INTO users (username) values (?)"
 INSERT_INTO_MAPS = "INSERT INTO maps (map_name) values (?)"
 
 class DatabaseHandler:
-    def __init__(self, filename) -> None:        
-        self.filename = filename
-        self.connection: Optional[aiosqlite.Connection] = None
+    """A class to manage SQLite databases per-server"""
+    def __init__(self, root_dir: str = "") -> None:
+        self.root_dir = root_dir
 
-    async def connect(self):
-        """Connects to the database"""
-        self.connection = await aiosqlite.connect(self.filename)
-
-    async def get_user_id(self, cursor: aiosqlite.Cursor, username: str):
+    async def _get_user_id(self, server_id: int, username: str):
         """Gets a user ID from a map name, inserting if not present"""
-        user_id = await cursor.execute(
-            SELECT_USERID_FROM_USERNAME, (username, )
-        ).fetchone()
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
 
-        if user_id is None:
-            await cursor.execute(INSERT_INTO_USERS, (username))
-            user_id = await cursor.execute(
-                SELECT_USERID_FROM_USERNAME, (username, )
-            ).fetchone()
+            await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
+            user_id = await cursor.fetchone()
+
+            if user_id is None:
+                await cursor.execute(INSERT_INTO_USERS, (username, ))
+                await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
+                user_id = await cursor.fetchone()
 
         return user_id[0]
 
-    async def get_map_id(self, cursor: aiosqlite.Cursor, mapname: str):
+    async def _get_map_id(self, server_id: int, mapname: str):
         """Gets a map ID from a map name, inserting if not present"""
-        map_id = await cursor.execute(
-            SELECT_MAPID_FROM_MAPNAME, (mapname, )
-        ).fetchone()
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
 
-        if map_id is None:
-            await cursor.execute(INSERT_INTO_MAPS, (mapname))
-            map_id = await cursor.execute(
-                SELECT_USERID_FROM_USERNAME, (mapname, )
-            ).fetchone()
+            await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname, ))
+            map_id = await cursor.fetchone()
+
+            if map_id is None:
+                await cursor.execute(INSERT_INTO_MAPS, (mapname, ))
+                await cursor.connection.commit()
+                await cursor.execute(SELECT_USERID_FROM_USERNAME, (mapname, ))
+                map_id = await cursor.fetchone()
 
         return map_id[0]
 
-    async def ensure_tables_exist(self):
+    async def _ensure_tables_exist(self, server_id: int):
         """
         makes sure the required tables exist.
         """
-        if self.connection is None:
-            await self.connect()
-        
-        cursor = await self.connection.cursor()
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
 
-        await cursor.execute(CREATE_USER_TABLE)
-        await cursor.execute(CREATE_MAPS_TABLE)
-        await cursor.execute(CREATE_DATA_TABLE)
+            await cursor.execute(CREATE_USER_TABLE)
+            await cursor.execute(CREATE_MAPS_TABLE)
+            await cursor.execute(CREATE_DATA_TABLE)
 
-        await cursor.close()
+            await cursor.commit()
 
-    async def write_line(self, username, mapname, result, role, sentiment,
-                         datetime):
+    async def write_line(self, server_id: int, username: str, mapname: str,
+                         result: str, role: str, sentiment: int,
+                         datetime: float):
         """writes a map review to a file"""
-        if self.connection is None:
-            await self.connect()
-        
-        cursor = await self.connection.cursor()
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
+            await self._ensure_tables_exist(server_id)
 
-        map_id = self.get_map_id(cursor, mapname)
-        user_id = self.get_user_id(cursor, username)
-        
-        cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result[0], role[0],
-                                          int(sentiment), int(datetime)))
+            map_id = await self._get_map_id(server_id, mapname)
+            user_id = await self._get_user_id(server_id, username)
 
-        cursor.close()
+            await cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result[0], role[0],
+                                              int(sentiment), int(datetime)))
 
-    async def get_last(self, n: int = 1):
+            await cursor.close()
+            await conn.commit()  # is this required?
+
+    async def get_last(self, server_id: int, n: int = 1):
         """
         gets the last line of data from the file, if present
-        note that this requires reading all lines from file, which may
-        cause issues in future
         """
-        if self.connection is None:
-            await self.connect()
-        
-        cursor = await self.connection.cursor()
-
+        # TODO
         if not isinstance(n, int):
             return None
-        
-        if n not in list(range(20)):
+
+        if n not in list(range(21)):
             return None
 
-        # WARN: This does risk SQL injection! However, given the value is a
-        #       bounded int, this should not pose much concern
-        cursor.execute(SELECT_LAST_N(n))
-        result = cursor.fetchall()
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
+            await self._ensure_tables_exist(server_id)
 
-        cursor.close()
+            # WARN: This does risk SQL injection! However, given the value is a
+            #       bounded int, this should not pose much concern
+            await cursor.execute(SELECT_LAST_N(n))
+            result = await cursor.fetchall()
+
+            await cursor.close()
+
         return result
 
-    async def delete_last(self, n: int = 1):
+    async def delete_ids(self, server_id: int, ids: list[int]):
         """
-        deletes the last line of data from the file, if present
-        note that this requires reading all lines from file, which may
-        cause issues in future
+        deletes specific ids from the file, if present
         """
-        # TODO
-        file_existed = await self.ensure_tables_exist()
-        if file_existed:
-            async with aiofiles.open(self.filename, mode="r") as file:
-                lines = await file.readlines()
-            async with aiofiles.open(self.filename, mode="w") as file:
-                await file.writelines(lines[:-n])
-                return lines[-n:]
+        if len(ids) > 20:
+            return
 
-        return ""
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
+            await self._ensure_tables_exist(server_id)
 
-    async def get_line_count(self):
-        # TODO
+            await cursor.execute(DELETE_N_IDS(len(ids)), ids)
+            await cursor.close()
+            await conn.commit()  # is this required?
+
+    async def get_line_count(self, server_id: int):
         """gets the number of (data) lines in the file"""
-        file_existed = await self.ensure_tables_exist()
-        if file_existed:
-            async with aiofiles.open(self.filename, mode="r") as file:
-                lines = await file.readlines()
-                return len(lines) - 1
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
+            await self._ensure_tables_exist(server_id)
 
-        return 0
+            await cursor.execute("select count(rating_id) from ow2")
+            count = await cursor.fetchone()[0]
 
-    def get_pandas_data(self):
-        # TODO
-        """reads the csv file into a Pandas df"""
-        data = pd.read_csv(self.filename)
+            await cursor.close()
+
+        return count
+
+    def get_pandas_data(self, server_id: int):
+        """
+        reads the csv file into a Pandas df
+        note that this function is *not* async
+        """
+
+        with sqlite3.connect(f"{self.root_dir}{server_id}.db") as conn:
+            data = pd.read_sql_query(SELECT_ALL, conn)
+
         data["time"] = pd.to_datetime(data["time"])
         data.rename(columns={"win/loss": "winloss"}, inplace=True)
         return data
