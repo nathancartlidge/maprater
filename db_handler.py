@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Optional
 
@@ -23,7 +24,7 @@ CREATE_DATA_TABLE = """
 CREATE TABLE IF NOT EXISTS ow2 (
     rating_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
     author_id INTEGER NOT NULL,
-    map_id    TEXT    NOT NULL,
+    map_id    INTEGER NOT NULL,
     result    CHAR(1) NOT NULL,
     role      CHAR(1) NOT NULL,
     sentiment INTEGER NOT NULL,
@@ -41,16 +42,16 @@ CREATE TABLE IF NOT EXISTS ow2 (
 """
 
 SELECT_COUNT = "SELECT COUNT(rating_id) FROM ow2"
-SELECT_ALL = """
-SELECT users.username, maps.map_name, ow2.result, ow2.role, ow2.sentiment,
-       datetime(ow2.datetime, 'unixepoch')
+SELECT_ALL_PANDAS = """
+SELECT users.username as author, maps.map_name as map, ow2.result as winloss,
+       ow2.role, ow2.sentiment, datetime(ow2.datetime, 'unixepoch') as time
     FROM ow2
         INNER JOIN users ON ow2.author_id = users.user_id
         INNER JOIN maps ON ow2.map_id = maps.map_id 
 """
 SELECT_LAST_N = lambda n: f"""
-SELECT users.username, maps.map_name, ow2.result, ow2.role, ow2.sentiment,
-       datetime(ow2.datetime, 'unixepoch')
+SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
+       ow2.sentiment, ow2.datetime
     FROM ow2
         INNER JOIN users ON ow2.author_id = users.user_id
         INNER JOIN maps ON ow2.map_id = maps.map_id 
@@ -61,9 +62,9 @@ SELECT_USERID_FROM_USERNAME = "SELECT user_id FROM users WHERE username = ?"
 SELECT_MAPID_FROM_MAPNAME = "SELECT map_id FROM maps WHERE map_name = ?"
 
 DELETE_N_IDS = lambda n: f"""
-SELECT * FROM ow2
+DELETE FROM ow2
     WHERE rating_id IN
-        ({', '.join(['?'*n])})
+        ({', '.join(['?']*n)})
 """
 
 INSERT_INTO_DATA = """
@@ -91,6 +92,7 @@ class DatabaseHandler:
                 await cursor.execute(INSERT_INTO_USERS, (username, ))
                 await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
                 user_id = await cursor.fetchone()
+                await conn.commit()
 
         return user_id[0]
 
@@ -104,9 +106,9 @@ class DatabaseHandler:
 
             if map_id is None:
                 await cursor.execute(INSERT_INTO_MAPS, (mapname, ))
-                await cursor.connection.commit()
-                await cursor.execute(SELECT_USERID_FROM_USERNAME, (mapname, ))
+                await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname, ))
                 map_id = await cursor.fetchone()
+                await conn.commit()
 
         return map_id[0]
 
@@ -121,30 +123,31 @@ class DatabaseHandler:
             await cursor.execute(CREATE_MAPS_TABLE)
             await cursor.execute(CREATE_DATA_TABLE)
 
-            await cursor.commit()
+            await cursor.close()
+            await conn.commit()
 
     async def write_line(self, server_id: int, username: str, mapname: str,
                          result: str, role: str, sentiment: int,
                          datetime: float):
-        """writes a map review to a file"""
+        """writes a map review to the database"""
+        await self._ensure_tables_exist(server_id)
+        map_id = await self._get_map_id(server_id, mapname)
+        user_id = await self._get_user_id(server_id, username)
+
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()
-            await self._ensure_tables_exist(server_id)
 
-            map_id = await self._get_map_id(server_id, mapname)
-            user_id = await self._get_user_id(server_id, username)
-
-            await cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result[0], role[0],
-                                              int(sentiment), int(datetime)))
+            await cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result[0],
+                                                    role[0], int(sentiment),
+                                                    int(datetime)))
 
             await cursor.close()
-            await conn.commit()  # is this required?
+            await conn.commit()
 
     async def get_last(self, server_id: int, n: int = 1):
         """
         gets the last line of data from the file, if present
         """
-        # TODO
         if not isinstance(n, int):
             return None
 
@@ -162,12 +165,15 @@ class DatabaseHandler:
 
             await cursor.close()
 
-        return result
+        # split into rating id and other information
+        return [line[0] for line in result], [line[1:] for line in result]
 
     async def delete_ids(self, server_id: int, ids: list[int]):
         """
         deletes specific ids from the file, if present
         """
+        logging.info("Deleting ids %s", ids)
+
         if len(ids) > 20:
             return
 
@@ -177,7 +183,7 @@ class DatabaseHandler:
 
             await cursor.execute(DELETE_N_IDS(len(ids)), ids)
             await cursor.close()
-            await conn.commit()  # is this required?
+            await conn.commit()
 
     async def get_line_count(self, server_id: int):
         """gets the number of (data) lines in the file"""
@@ -186,7 +192,8 @@ class DatabaseHandler:
             await self._ensure_tables_exist(server_id)
 
             await cursor.execute("select count(rating_id) from ow2")
-            count = await cursor.fetchone()[0]
+            count = await cursor.fetchone()
+            count = count[0]
 
             await cursor.close()
 
@@ -198,9 +205,10 @@ class DatabaseHandler:
         note that this function is *not* async
         """
 
+        logging.info("Getting data as Pandas")
+
         with sqlite3.connect(f"{self.root_dir}{server_id}.db") as conn:
-            data = pd.read_sql_query(SELECT_ALL, conn)
+            data = pd.read_sql_query(SELECT_ALL_PANDAS, conn)
 
         data["time"] = pd.to_datetime(data["time"])
-        data.rename(columns={"win/loss": "winloss"}, inplace=True)
         return data

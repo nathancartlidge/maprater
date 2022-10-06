@@ -4,7 +4,7 @@ import discord
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from embed_handler import MapButtons, UndoLast
+from embed_handler import QUAL, MapButtons, UndoLast
 from db_handler import DatabaseHandler
 
 
@@ -44,11 +44,29 @@ class BaseCommands(commands.Cog):
         count: Option(int, description="Number of entries to return",
                       min_value=1, max_value=20, default=1)
     ):
+        """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.debug("Getting last %s rows - Invoked by %s",
                       count, ctx.author)
-        lines = await self.db_handler.get_last(ctx.guild_id, count)
-        await ctx.respond(
-            content=f"```{''.join(lines)}```",
-            view=UndoLast(lines, count, self.db_handler),
-            ephemeral=True
-        )
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, count)
+        if len(lines) == 0:
+            await ctx.respond(content="No ratings found!", ephemeral=True)
+        else:
+            lines = self._format_lines(lines)
+            await ctx.respond(
+                content="\n".join(lines),
+                view=UndoLast(lines, ids, self.db_handler),
+                ephemeral=True
+            )
+
+    def _format_lines(self, lines):
+        """convert lines into pretty strings"""
+        output = []
+        for (username, map_name, result, role, sentiment, datetime) in lines:
+            result_string = {"w": "Win", "l": "Loss", "x": "Draw"}[result]
+            role_string = {"t": ":shield:", "d": ":gun:", "s": ":stethoscope:"}[role]
+            sent_string = QUAL[sentiment]
+
+            output.append(f"{username} <t:{datetime}:R>: {result_string} on "
+                          + f"*{map_name}* ({role_string}) - *'{sent_string}'*")
+
+        return output

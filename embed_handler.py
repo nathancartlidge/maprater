@@ -1,11 +1,9 @@
 import time
 import logging
 
-from datetime import datetime as dt
-
 import discord
-from discord.interactions import Interaction
 from discord import ButtonStyle
+from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
 
@@ -29,7 +27,7 @@ class MapButtons(discord.ui.View):
 
     async def _callback(self, map_name, interaction: Interaction):
         logging.info("map callback - %s by %s", map_name, interaction.user)
-        
+
         deltime = round(time.time() + TTL)
         text = f"rating for **{map_name}**: (deletes <t:{deltime}:R>)"
 
@@ -115,7 +113,7 @@ class MapButtons(discord.ui.View):
                        style=ButtonStyle.green, row=3)
     async def _Ilios(self, _, interaction):
         await self._callback("Ilios", interaction)
-    
+
     @discord.ui.button(label="Lijiang Tower", custom_id="Lijang",
                        style=ButtonStyle.green, row=3)
     async def _Lijang(self, _, interaction):
@@ -273,7 +271,8 @@ class VotingButtons(discord.ui.View):
 
 
 class UndoLast(discord.ui.View):
-    def __init__(self, lines, ids: list[int], db_handler: DatabaseHandler) -> None:
+    """View for the 'undo' button triggered after /last"""
+    def __init__(self, lines, ids: tuple[int], db_handler: DatabaseHandler) -> None:
         self.lines = lines
         self.ids = ids
         self.db_handler = db_handler
@@ -283,6 +282,6 @@ class UndoLast(discord.ui.View):
     async def _undo(self, _, interaction: Interaction):
         await self.db_handler.delete_ids(interaction.guild_id, self.ids)
         await self.message.edit(
-            content=f"```{''.join(self.lines)}```*successfully deleted*",
+            content="\n".join(self.lines) + "\n\n*successfully deleted*",
             view=None
         )
