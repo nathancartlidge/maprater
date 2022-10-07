@@ -24,7 +24,9 @@ WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
 
 
 class PlotCommands(commands.Cog):
-    def __init__(self, db_handler: DatabaseHandler):
+    """Commands related to plotting data"""
+    def __init__(self, db_handler: DatabaseHandler) -> None:
+        super().__init__()
         self.db_handler = db_handler
 
     @slash_command(description="Plot the current data")
@@ -34,7 +36,12 @@ class PlotCommands(commands.Cog):
                                 choices=["normalise", "group", "ungroup", "count", "distribution"]),
                    user: Option(discord.Member, description="Limit data to a particular person",
                                 required=False, default=None)):
+        """Creates a plot of the current rating set"""
         logging.debug("Creating Plot - Invoked by %s", ctx.author)
+        if ctx.guild_id is None:
+            await ctx.respond(":warning: This bot does not support DMs")
+            return
+
         data = self.db_handler.get_pandas_data(ctx.guild_id)
 
         if user is not None:
@@ -47,7 +54,7 @@ class PlotCommands(commands.Cog):
 
         if (lines := data.shape[0]) < 1:
             await ctx.respond(
-                content="Error - No matching data found - Cannot create graphs",
+                content=":warning: No matching data found - Cannot create graphs",
                 ephemeral=True
             )
             return
@@ -60,7 +67,7 @@ class PlotCommands(commands.Cog):
             buffer = self._export_figure(figure)
         except:
             await ctx.respond(
-                content="Error occured while making graph",
+                content=":warning: Error occured while making graph",
                 ephemeral=True
             )
             raise
@@ -76,7 +83,7 @@ class PlotCommands(commands.Cog):
     def _process_data(self, data: pd.DataFrame, mode: str = None,
                       draw_is_loss: bool = False):
         """Converts raw Dataframe to Pandas group-by format"""
-        
+
         data = data.replace(to_replace="x", value="l" if draw_is_loss else "w")
         data = data.replace(to_replace=["w", "l"], value=["Win", "Loss"])
 

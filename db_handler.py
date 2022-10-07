@@ -149,10 +149,10 @@ class DatabaseHandler:
         gets the last line of data from the file, if present
         """
         if not isinstance(n, int):
-            return None
+            return [], []
 
         if n not in list(range(21)):
-            return None
+            return [], []
 
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()

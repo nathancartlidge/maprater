@@ -240,7 +240,7 @@ class VotingButtons(discord.ui.View):
 
         if (user := str(interaction.user)) in self.votes:
             await interaction.response.send_message(
-                content="You have already voted! To remove a vote, use the `/last` command",
+                content=":warning: You have already voted! To remove a vote, try `/last`",
                 ephemeral=True
             )
             return
@@ -251,7 +251,7 @@ class VotingButtons(discord.ui.View):
 
         if a is None or b is None or c is None:
             await interaction.response.send_message(
-                content="Please fill in all sections!",
+                content=":warning: Please fill in all sections!",
                 ephemeral=True
             )
             return
@@ -272,14 +272,18 @@ class VotingButtons(discord.ui.View):
 
 class UndoLast(discord.ui.View):
     """View for the 'undo' button triggered after /last"""
-    def __init__(self, lines, ids: tuple[int], db_handler: DatabaseHandler) -> None:
+    def __init__(self, lines, ids: tuple[int], db_handler: DatabaseHandler,
+                 can_delete: bool = False) -> None:
+        super().__init__()
         self.lines = lines
         self.ids = ids
         self.db_handler = db_handler
-        super().__init__()
+        for child in self.children:
+            child.disabled = not can_delete  # type: ignore
 
-    @discord.ui.button(label="Delete row(s)", style=ButtonStyle.red)
+    @discord.ui.button(label="Delete row(s)", style=ButtonStyle.red, disabled=True)
     async def _undo(self, _, interaction: Interaction):
+        assert self.message is not None
         await self.db_handler.delete_ids(interaction.guild_id, self.ids)
         await self.message.edit(
             content="\n".join(self.lines) + "\n\n*successfully deleted*",
