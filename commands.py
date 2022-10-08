@@ -1,6 +1,9 @@
+"""Implements basic bot commands"""
+
 import logging
 
 import discord
+from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
@@ -14,7 +17,7 @@ class BaseCommands(commands.Cog):
         self.db_handler = db_handler
 
     @slash_command(description="Create rating buttons")
-    async def make_buttons(self, ctx: discord.context.ApplicationContext):
+    async def make_buttons(self, ctx: ApplicationContext):
         """
         Create map-rating buttons.
         Note that this will only work once per channel?
@@ -30,7 +33,7 @@ class BaseCommands(commands.Cog):
         )
 
     @slash_command(description="Get raw data")
-    async def data(self, ctx: discord.context.ApplicationContext):
+    async def data(self, ctx: ApplicationContext):
         """Extracts raw data from the bot"""
         logging.debug("Getting Raw Data - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -49,7 +52,7 @@ class BaseCommands(commands.Cog):
 
     @slash_command(description="Get the last n rows of data")
     async def last(
-        self, ctx: discord.context.ApplicationContext,
+        self, ctx: ApplicationContext,
         count: Option(int, description="Number of entries to return",
                       min_value=1, max_value=20, default=1)
     ):

@@ -1,3 +1,5 @@
+"""Provides views - primarily for map voting"""
+
 import time
 import logging
 
@@ -147,6 +149,7 @@ class MapButtons(discord.ui.View):
 
 
 class VotingButtons(discord.ui.View):
+    """Provides the initialised voting buttons"""
     def __init__(self, line, voted_map, db_handler: DatabaseHandler):
         super().__init__()
         self.line = line
@@ -169,11 +172,11 @@ class VotingButtons(discord.ui.View):
 
     @discord.ui.button(label="draw", style=ButtonStyle.grey, row=0)
     async def _draw(self, _, interaction):
-        await self._result("w", interaction)
+        await self._result("x", interaction)
 
     @discord.ui.button(label="loss", style=ButtonStyle.red, row=0)
     async def _loss(self, _, interaction):
-        await self._result("w", interaction)
+        await self._result("l", interaction)
 
 
     async def _role(self, role, interaction: Interaction):
@@ -236,6 +239,7 @@ class VotingButtons(discord.ui.View):
 
     @discord.ui.button(label="Submit", style=ButtonStyle.blurple, row=4)
     async def _submit(self, _, interaction: Interaction):
+        assert interaction.guild_id is not None
         logging.info("Submit - %s", interaction.user)
 
         if (user := str(interaction.user)) in self.votes:
@@ -272,7 +276,7 @@ class VotingButtons(discord.ui.View):
 
 class UndoLast(discord.ui.View):
     """View for the 'undo' button triggered after /last"""
-    def __init__(self, lines, ids: tuple[int], db_handler: DatabaseHandler,
+    def __init__(self, lines, ids: list[int], db_handler: DatabaseHandler,
                  can_delete: bool = False) -> None:
         super().__init__()
         self.lines = lines
@@ -284,6 +288,8 @@ class UndoLast(discord.ui.View):
     @discord.ui.button(label="Delete row(s)", style=ButtonStyle.red, disabled=True)
     async def _undo(self, _, interaction: Interaction):
         assert self.message is not None
+        assert interaction.guild_id is not None
+
         await self.db_handler.delete_ids(interaction.guild_id, self.ids)
         await self.message.edit(
             content="\n".join(self.lines) + "\n\n*successfully deleted*",

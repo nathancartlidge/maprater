@@ -1,5 +1,9 @@
+"""Provides all plotting functionality"""
+
 import io
 import logging
+
+from typing import Optional
 
 import discord
 import pandas as pd
@@ -7,13 +11,15 @@ import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from discord.commands import Option, slash_command
+from discord import ApplicationContext
 from discord.ext import commands
+from discord.commands import Option, slash_command
 
 from db_handler import DatabaseHandler
 
 PLOT_DESCRIPTION = {
-    "normalise": "Data has been normalised by winrate (equal weight to ratings given from losses as ratings given from wins)",
+    "normalise": "Data has been normalised by winrate (equal weight to ratings" \
+        + " given from losses as ratings given from wins)",
     "group": "Data has been separated by win/loss",
     "ungroup": "Data has not been normalised",
     "count": "Data shows the number of ratings per map, separated by win/loss",
@@ -30,7 +36,7 @@ class PlotCommands(commands.Cog):
         self.db_handler = db_handler
 
     @slash_command(description="Plot the current data")
-    async def plot(self, ctx: discord.context.ApplicationContext,
+    async def plot(self, ctx: ApplicationContext,
                    mode: Option(str, description="What plotting mode should be used?",
                                 default="normalise",
                                 choices=["normalise", "group", "ungroup", "count", "distribution"]),
@@ -80,7 +86,7 @@ class PlotCommands(commands.Cog):
 
         del buffer, figure, aggregate
 
-    def _process_data(self, data: pd.DataFrame, mode: str = None,
+    def _process_data(self, data: pd.DataFrame, mode: Optional[str] = None,
                       draw_is_loss: bool = False):
         """Converts raw Dataframe to Pandas group-by format"""
 
@@ -180,16 +186,17 @@ class PlotCommands(commands.Cog):
             ax.set_xlim(-1, 7)
             ax.set_xlabel("Quality")
         elif mode != "count":
-            ax.set_ylim((0, 6))
+            ax.set_ylim(bottom=0, top=6)
             ax.set_ylabel("Quality")
 
         if mode in ("group", "count", "distribution", "distribution_all"):
             legend = ax.get_legend()
-            if mode == "distribution_all":
-                legend.set_title("Author")
-            else:
-                legend.set_title("Win / Loss")
-            legend.get_frame().set_alpha(0)
+            if legend is not None:
+                if mode == "distribution_all":
+                    legend.set_title("Author")
+                else:
+                    legend.set_title("Win / Loss")
+                legend.get_frame().set_alpha(0)
 
         sns.despine(ax=ax)
 
