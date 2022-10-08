@@ -17,7 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("-a", "--all-servers", action="store_false", default=True)
     args = parser.parse_args()
 
-    db_handler = DatabaseHandler(root_dir="")
+    db_handler = DatabaseHandler(root_dir="/data/")
 
     # Load a discord API key from a .env file
     load_dotenv()

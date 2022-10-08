@@ -116,10 +116,10 @@ class MapButtons(discord.ui.View):
     async def _Ilios(self, _, interaction):
         await self._callback("Ilios", interaction)
 
-    @discord.ui.button(label="Lijiang Tower", custom_id="Lijang",
+    @discord.ui.button(label="Lijiang Tower", custom_id="Lijiang",
                        style=ButtonStyle.green, row=3)
     async def _Lijang(self, _, interaction):
-        await self._callback("Lijang", interaction)
+        await self._callback("Lijiang", interaction)
 
     @discord.ui.button(label="Nepal", custom_id="Nepal",
                        style=ButtonStyle.green, row=3)
