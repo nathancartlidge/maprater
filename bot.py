@@ -4,18 +4,18 @@ import logging
 from embed_handler import MapButtons
 
 class MapRater(discord.Bot):
-    def __init__(self, file_handler, description="Overwatch Map Rating", *args, **options):
+    def __init__(self, db_handler, description="Overwatch Map Rating", *args, **options):
         super().__init__(description, *args, **options)
-        self.file_handler = file_handler
+        self.db_handler = db_handler
 
     async def on_ready(self):
         """Log and set presence"""
         logging.info("Bot started")
         await self.change_presence(
-            activity=discord.Game(name="the worst ow maps")
+            activity=discord.Game(name="the worst ow2 maps!")
         )
         # enable persistence for the map buttons
-        self.add_view(MapButtons(self.file_handler))
+        self.add_view(MapButtons(self.db_handler))
 
     async def on_connect(self):
         logging.info("Syncing commands")

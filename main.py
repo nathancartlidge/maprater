@@ -7,14 +7,17 @@ from dotenv import load_dotenv
 from bot import MapRater
 from commands import BaseCommands
 from plotting import PlotCommands
-from file_handler import FileHandler
+from db_handler import DatabaseHandler
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action="store_true", default=False)
+    parser.add_argument("-a", "--all-servers", action="store_false", default=True)
     args = parser.parse_args()
+
+    db_handler = DatabaseHandler(root_dir="")
 
     # Load a discord API key from a .env file
     load_dotenv()
@@ -27,14 +30,19 @@ if __name__ == "__main__":
         TOKEN = os.getenv("DISCORD_TOKEN")
         GUILD = os.getenv("DISCORD_GUILD", None)
 
-    file_handler = FileHandler("/data/ow2_data.csv")
-    bot = MapRater(file_handler=file_handler, debug_guilds=[GUILD])
+    if args.all_servers:
+        bot = MapRater(db_handler=db_handler, debug_guilds=[GUILD])
 
-    @bot.slash_command()
-    async def ping(ctx):
-        await ctx.respond(f"pong! [{round(bot.latency, 2)}s]", ephemeral=True)
+    else:
+        bot = MapRater(db_handler=db_handler)
 
-    bot.add_cog(BaseCommands(bot.file_handler))
-    bot.add_cog(PlotCommands(bot.file_handler))
+    if args.debug:
+        @bot.slash_command()
+        async def ping(ctx):
+            """Show bot latency [debug]"""
+            await ctx.respond(f"pong! [{round(bot.latency, 2)}s]", ephemeral=True)
+
+    bot.add_cog(BaseCommands(bot.db_handler))
+    bot.add_cog(PlotCommands(bot.db_handler))
 
     bot.run(TOKEN)

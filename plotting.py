@@ -1,6 +1,7 @@
+"""Provides all plotting functionality"""
+
 import io
 import logging
-from sys import platlibdir
 
 from typing import Optional
 
@@ -10,13 +11,15 @@ import seaborn as sns
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
-from discord.commands import Option, slash_command
+from discord import ApplicationContext
 from discord.ext import commands
+from discord.commands import Option, slash_command
 
-from file_handler import FileHandler
+from db_handler import DatabaseHandler
 
 PLOT_DESCRIPTION = {
-    "normalise": "Data has been normalised by winrate (equal weight to ratings given from losses as ratings given from wins)",
+    "normalise": "Data has been normalised by winrate (equal weight to ratings" \
+        + " given from losses as ratings given from wins)",
     "group": "Data has been separated by win/loss",
     "ungroup": "Data has not been normalised",
     "count": "Data shows the number of ratings per map, separated by win/loss",
@@ -27,19 +30,25 @@ WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
 
 
 class PlotCommands(commands.Cog):
-    def __init__(self, file_handler: FileHandler):
-        self.file_handler = file_handler
+    """Commands related to plotting data"""
+    def __init__(self, db_handler: DatabaseHandler) -> None:
+        super().__init__()
+        self.db_handler = db_handler
 
     @slash_command(description="Plot the current data")
-    async def plot(self, ctx: discord.context.ApplicationContext,
+    async def plot(self, ctx: ApplicationContext,
                    mode: Option(str, description="What plotting mode should be used?",
                                 default="normalise",
                                 choices=["normalise", "group", "ungroup", "count", "distribution"]),
                    user: Option(discord.Member, description="Limit data to a particular person",
                                 required=False, default=None)):
+        """Creates a plot of the current rating set"""
         logging.debug("Creating Plot - Invoked by %s", ctx.author)
-        await self.file_handler.ensure_file_exists()  # prevents issues with deleted file
-        data = self.file_handler.get_pandas_data()
+        if ctx.guild_id is None:
+            await ctx.respond(":warning: This bot does not support DMs")
+            return
+
+        data = self.db_handler.get_pandas_data(ctx.guild_id)
 
         if user is not None:
             # filter data to the user specified
@@ -51,7 +60,7 @@ class PlotCommands(commands.Cog):
 
         if (lines := data.shape[0]) < 1:
             await ctx.respond(
-                content="Error - No matching data found - Cannot create graphs",
+                content=":warning: No matching data found - Cannot create graphs",
                 ephemeral=True
             )
             return
@@ -64,7 +73,7 @@ class PlotCommands(commands.Cog):
             buffer = self._export_figure(figure)
         except:
             await ctx.respond(
-                content="Error occured while making graph",
+                content=":warning: Error occured while making graph",
                 ephemeral=True
             )
             raise
@@ -77,10 +86,10 @@ class PlotCommands(commands.Cog):
 
         del buffer, figure, aggregate
 
-    def _process_data(self, data: pd.DataFrame, mode: str = None,
+    def _process_data(self, data: pd.DataFrame, mode: Optional[str] = None,
                       draw_is_loss: bool = False):
         """Converts raw Dataframe to Pandas group-by format"""
-        
+
         data = data.replace(to_replace="x", value="l" if draw_is_loss else "w")
         data = data.replace(to_replace=["w", "l"], value=["Win", "Loss"])
 
@@ -177,16 +186,17 @@ class PlotCommands(commands.Cog):
             ax.set_xlim(-1, 7)
             ax.set_xlabel("Quality")
         elif mode != "count":
-            ax.set_ylim((0, 6))
+            ax.set_ylim(bottom=0, top=6)
             ax.set_ylabel("Quality")
 
         if mode in ("group", "count", "distribution", "distribution_all"):
             legend = ax.get_legend()
-            if mode == "distribution_all":
-                legend.set_title("Author")
-            else:
-                legend.set_title("Win / Loss")
-            legend.get_frame().set_alpha(0)
+            if legend is not None:
+                if mode == "distribution_all":
+                    legend.set_title("Author")
+                else:
+                    legend.set_title("Win / Loss")
+                legend.get_frame().set_alpha(0)
 
         sns.despine(ax=ax)
 
