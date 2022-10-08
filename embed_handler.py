@@ -147,11 +147,11 @@ class VotingButtons(discord.ui.View):
 
     @discord.ui.button(label="draw", style=ButtonStyle.grey, row=0)
     async def _draw(self, _, interaction):
-        await self._result("w", interaction)
+        await self._result("x", interaction)
 
     @discord.ui.button(label="loss", style=ButtonStyle.red, row=0)
     async def _loss(self, _, interaction):
-        await self._result("w", interaction)
+        await self._result("l", interaction)
 
 
     async def _role(self, role, interaction: Interaction):
