@@ -1,6 +1,6 @@
 """Provides all plotting functionality"""
 
-import io
+from io import BytesIO
 import logging
 
 from typing import Optional
@@ -28,6 +28,7 @@ PLOT_DESCRIPTION = {
 }
 WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
 
+mpl.use("agg")  # force non-interactive backend
 
 class PlotCommands(commands.Cog):
     """Commands related to plotting data"""
@@ -211,7 +212,7 @@ class PlotCommands(commands.Cog):
         fig.set_dpi(450)
         fig.tight_layout()
 
-        buffer = io.BytesIO()
+        buffer = BytesIO()
         fig.savefig(buffer, transparent=True)
         buffer.seek(0)
 

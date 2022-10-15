@@ -1,6 +1,4 @@
 import logging
-import os
-from typing import Optional
 
 import sqlite3
 import aiosqlite

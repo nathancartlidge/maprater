@@ -1,11 +1,13 @@
 """Implements basic bot commands"""
 
+from io import BytesIO
 import logging
 
 import discord
 from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
+import pandas as pd
 
 from embed_handler import QUAL, MapButtons, UndoLast
 from db_handler import DatabaseHandler
@@ -33,7 +35,9 @@ class BaseCommands(commands.Cog):
         )
 
     @slash_command(description="Get raw data")
-    async def data(self, ctx: ApplicationContext):
+    async def data(self, ctx: ApplicationContext,
+                   format: Option(str, description="Output Data Format",
+                                  default="sqlite", choices=["sqlite", "csv"])):
         """Extracts raw data from the bot"""
         logging.debug("Getting Raw Data - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -41,14 +45,26 @@ class BaseCommands(commands.Cog):
             return
 
         lines = await self.db_handler.get_line_count(ctx.guild_id)
-        if lines != -1:
-            await ctx.respond(
-                content=f"{lines} entries",
-                file=discord.File(f"{self.db_handler.root_dir}{ctx.guild_id}.db"),
-                ephemeral=True
-            )
-        else:
+
+        if lines < 1:
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
+            return
+
+        if format == "sqlite" or format is None:
+            path = f"{self.db_handler.root_dir}{ctx.guild_id}.db"
+            file = discord.File(fp=path, filename="data.db")
+        else:
+            pd_data = self.db_handler.get_pandas_data(ctx.guild_id)
+            buffer = BytesIO()
+            pd_data.to_csv(buffer, index=False)
+            buffer.seek(0)
+            file = discord.File(fp=buffer, filename="data.csv")
+
+        await ctx.respond(
+            content=f"{lines} entries",
+            file=file,
+            ephemeral=True
+        )
 
     @slash_command(description="Get the last n rows of data")
     async def last(
