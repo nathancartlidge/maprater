@@ -66,6 +66,56 @@ class BaseCommands(commands.Cog):
             ephemeral=True
         )
 
+    @slash_command(description="Describe dataset (summary statistics)")
+    async def describe(self, ctx: ApplicationContext,
+                       user: Option(discord.Member,
+                                    description="Limit data to a particular person",
+                                    required=False, default=None)):
+        """Prints a text description of the data"""
+        lines = await self.db_handler.get_line_count(ctx.guild_id)
+
+        if lines < 1:
+            await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
+            return
+
+        data = self.db_handler.get_pandas_data(ctx.guild_id)
+
+        if user is not None:
+            data = data[data.author == str(user)]
+
+        if data.shape[0] == 0:
+            await ctx.respond(content=":warning: No ratings found for that user!", ephemeral=True)
+            return
+
+        data.replace(to_replace={"l": "Loss", "w": "Win", "x": "Draw"}, inplace=True)
+        
+        def _process(data: pd.DataFrame, column: pd.Series):
+            grouped = data.groupby([column]).describe()["sentiment"]
+            grouped = grouped[["count", "mean", "std"]]
+            grouped["count"] = grouped["count"].astype(int)
+            grouped.index.rename("result", inplace=True)
+            grouped.rename(columns={"count": "count", "mean": "mean",
+                                    "std": "stdev"}, inplace=True)
+            grouped = grouped.round(decimals=3)
+            return grouped
+
+        def _prettytable(data: pd.Series):
+            string = str(data).splitlines()
+            spaces = len(string[0]) - len(string[0].lstrip(" ")) - 1
+            string.insert(2, "─"*len(string[0]))
+            for i, line in enumerate(string):
+                char = "│" if i != 2 else "┼"
+                string[i] = line[0:spaces] + char + line[spaces:]
+            return "\n".join(string)
+
+        grouped_winloss = _prettytable(_process(data, data.winloss))
+        line = f"```c\n{grouped_winloss}```"
+        if user is None:
+            grouped_author = _prettytable(_process(data, data.author))
+            line += f"```c\n{grouped_author}```"
+
+        await ctx.respond(content=line, ephemeral=True)
+
     @slash_command(description="Get the last n rows of data")
     async def last(
         self, ctx: ApplicationContext,
