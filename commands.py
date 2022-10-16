@@ -36,8 +36,8 @@ class BaseCommands(commands.Cog):
 
     @slash_command(description="Get raw data")
     async def data(self, ctx: ApplicationContext,
-                   format: Option(str, description="Output Data Format",
-                                  default="sqlite", choices=["sqlite", "csv"])):
+                   data_format: Option(str, description="Output Data Format",
+                                       default="sqlite", choices=["sqlite", "csv"])):
         """Extracts raw data from the bot"""
         logging.debug("Getting Raw Data - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -50,7 +50,7 @@ class BaseCommands(commands.Cog):
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
             return
 
-        if format == "sqlite" or format is None:
+        if data_format == "sqlite" or data_format is None:
             path = f"{self.db_handler.root_dir}{ctx.guild_id}.db"
             file = discord.File(fp=path, filename="data.db")
         else:
@@ -72,6 +72,7 @@ class BaseCommands(commands.Cog):
                                     description="Limit data to a particular person",
                                     required=False, default=None)):
         """Prints a text description of the data"""
+        logging.info("Describing file - invoked by %s", ctx.author)
         lines = await self.db_handler.get_line_count(ctx.guild_id)
 
         if lines < 1:
@@ -88,7 +89,7 @@ class BaseCommands(commands.Cog):
             return
 
         data.replace(to_replace={"l": "Loss", "w": "Win", "x": "Draw"}, inplace=True)
-        
+
         def _process(data: pd.DataFrame, column: pd.Series):
             grouped = data.groupby([column]).describe()["sentiment"]
             grouped = grouped[["count", "mean", "std"]]
@@ -120,8 +121,9 @@ class BaseCommands(commands.Cog):
     async def last(
         self, ctx: ApplicationContext,
         count: Option(int, description="Number of entries to return",
-                      min_value=1, max_value=20, default=1)
-    ):
+                      min_value=1, max_value=20, default=1),
+        user: Option(discord.Member, description="Limit to a particular person",
+                     required=False, default=None)):
         """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.debug("Getting last %s rows - Invoked by %s",
                       count, ctx.author)
@@ -129,7 +131,9 @@ class BaseCommands(commands.Cog):
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
-        ids, lines = await self.db_handler.get_last(ctx.guild_id, count)
+        username = str(user) if user is not None else None
+
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username)
         if len(lines) == 0:
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
         else:
@@ -139,6 +143,13 @@ class BaseCommands(commands.Cog):
                 can_delete = True
 
             lines = self._format_lines(lines)
+            length = len("\n".join(lines))
+            if length > 2000:
+                await ctx.respond(content=":warning: Output too long for discord!" \
+                                          + "You may need to reduce `count`.",
+                                  ephemeral=True)
+                return
+
             await ctx.respond(
                 content="\n".join(lines),
                 view=UndoLast(lines, ids, self.db_handler, can_delete),
@@ -149,11 +160,13 @@ class BaseCommands(commands.Cog):
         """convert lines into pretty strings"""
         output = []
         for (username, map_name, result, role, sentiment, datetime) in lines:
-            result_string = {"w": "Win", "l": "Loss", "x": "Draw"}[result]
-            role_string = {"t": ":shield:", "d": ":gun:", "s": ":stethoscope:"}[role]
+            result_string = {"w": "🏆", "l": "❌", "x": "🤝"}[result]
+            role_string = {"t": "<:Tank:1031299011493249155>",
+                           "d": "<:Damage:1031299007793864734>",
+                           "s": "<:Support:1031299004836880384>"}[role]
             sent_string = QUAL[sentiment]
 
-            output.append(f"{username} <t:{datetime}:R>: {result_string} on "
-                          + f"*{map_name}* ({role_string}) - *'{sent_string}'*")
+            output.append(f"`{username}`: {result_string} on {role_string} on *{map_name}*"
+                          + f" - *'{sent_string}'* (<t:{datetime}:R>)")
 
         return output

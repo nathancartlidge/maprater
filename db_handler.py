@@ -1,4 +1,7 @@
+"""Database connectivity functions"""
+
 import logging
+from typing import Optional
 
 import sqlite3
 import aiosqlite
@@ -47,23 +50,40 @@ SELECT users.username as author, maps.map_name as map, ow2.result as winloss,
         INNER JOIN users ON ow2.author_id = users.user_id
         INNER JOIN maps ON ow2.map_id = maps.map_id 
 """
-SELECT_LAST_N = lambda n: f"""
-SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
-       ow2.sentiment, ow2.datetime
-    FROM ow2
-        INNER JOIN users ON ow2.author_id = users.user_id
-        INNER JOIN maps ON ow2.map_id = maps.map_id 
-    ORDER BY rating_id DESC
-    LIMIT {min(20, max(1, int(n))):0d};
-"""
+def SELECT_LAST_N(n: int):
+    """Method to select `n` entries from the dataset"""
+    return f"""
+        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
+            ow2.sentiment, ow2.datetime
+            FROM ow2
+                INNER JOIN users ON ow2.author_id = users.user_id
+                INNER JOIN maps ON ow2.map_id = maps.map_id 
+            ORDER BY rating_id DESC
+            LIMIT {min(20, max(1, int(n))):0d};
+    """
+def SELECT_LAST_N_USERNAME(n: int):
+    """Method to select `n` entries from the dataset, filtering by username"""
+    return f"""
+        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
+            ow2.sentiment, ow2.datetime
+            FROM ow2
+                INNER JOIN users ON ow2.author_id = users.user_id
+                INNER JOIN maps ON ow2.map_id = maps.map_id 
+            WHERE users.username = ?
+            ORDER BY rating_id DESC
+            LIMIT {min(20, max(1, int(n))):0d};
+    """
+
 SELECT_USERID_FROM_USERNAME = "SELECT user_id FROM users WHERE username = ?"
 SELECT_MAPID_FROM_MAPNAME = "SELECT map_id FROM maps WHERE map_name = ?"
 
-DELETE_N_IDS = lambda n: f"""
-DELETE FROM ow2
-    WHERE rating_id IN
-        ({', '.join(['?']*n)})
-"""
+def DELETE_N_IDS(n: int):
+    """Method to delete `n` ids from the dataset"""
+    return f"""
+        DELETE FROM ow2
+            WHERE rating_id IN
+                ({', '.join(['?']*n)})
+    """
 
 INSERT_INTO_DATA = """
 INSERT INTO ow2
@@ -142,14 +162,15 @@ class DatabaseHandler:
             await cursor.close()
             await conn.commit()
 
-    async def get_last(self, server_id: int, n: int = 1):
+    async def get_last(self, server_id: int, count: int = 1,
+                       username: Optional[str] = None):
         """
         gets the last line of data from the file, if present
         """
-        if not isinstance(n, int):
+        if not isinstance(count, int):
             return [], []
 
-        if n not in list(range(21)):
+        if count not in list(range(21)):
             return [], []
 
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
@@ -158,7 +179,11 @@ class DatabaseHandler:
 
             # WARN: This does risk SQL injection! However, given the value is a
             #       bounded int, this should not pose much concern
-            await cursor.execute(SELECT_LAST_N(n))
+            if username is None:
+                await cursor.execute(SELECT_LAST_N(count))
+            else:
+                await cursor.execute(SELECT_LAST_N_USERNAME(count), (username,))
+
             result = await cursor.fetchall()
 
             await cursor.close()
