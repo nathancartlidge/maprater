@@ -20,13 +20,42 @@ from db_handler import DatabaseHandler
 PLOT_DESCRIPTION = {
     "normalise": "Data has been normalised by winrate (equal weight to ratings" \
         + " given from losses as ratings given from wins)",
-    "group": "Data has been separated by win/loss",
-    "ungroup": "Data has not been normalised",
+    "group": "Data has been separated by map and win/loss",
+    "map_type": "Data has been separated by map type",
+    "role": "Data has been separated by map type and role, not normalised",
+    "ungroup": "Data has been separated by map, but has not been normalised",
     "count": "Data shows the number of ratings per map, separated by win/loss",
     "distribution": "Data shows KDE-smoothed plot of ranking distribution, separated by win/loss",
     "distribution_all": "Data shows KDE-smoothed plot of ranking distribution, separated by voter"
 }
 WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
+ROLE_PALETTE = {"Tank": "tab:orange", "Damage": "tab:blue", "Support": "tab:green"}
+MAP_TYPES = {
+    "Circuit": "Payload",
+    "Dorado": "Payload",
+    "Havana": "Payload",
+    "Junkertown": "Payload",
+    "Rialto": "Payload",
+    "R66": "Payload",
+    "WPG": "Payload",
+
+    "Blizzard": "Hybrid",
+    "Eichenwalde": "Hybrid",
+    "Hollywood": "Hybrid",
+    "Kings": "Hybrid",
+    "Midtown": "Hybrid",
+    "Paraiso": "Hybrid",
+
+    "Busan": "Control",
+    "Ilios": "Control",
+    "Lijiang": "Control",
+    "Nepal": "Control",
+    "Oasis": "Control",
+
+    "QueenStreet": "Push",
+    "Esperanca": "Push",
+    "Colosseo": "Push"
+}
 
 mpl.use("agg")  # force non-interactive backend
 
@@ -40,11 +69,13 @@ class PlotCommands(commands.Cog):
     async def plot(self, ctx: ApplicationContext,
                    mode: Option(str, description="What plotting mode should be used?",
                                 default="normalise",
-                                choices=["normalise", "group", "ungroup", "count", "distribution"]),
+                                choices=["normalise", "group", "ungroup",
+                                         "map_type", "role", "count",
+                                         "distribution"]),
                    user: Option(discord.Member, description="Limit data to a particular person",
                                 required=False, default=None)):
         """Creates a plot of the current rating set"""
-        logging.debug("Creating Plot - Invoked by %s", ctx.author)
+        logging.info("Creating Plot (%s/%s) - Invoked by %s", mode, user, ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
@@ -91,14 +122,23 @@ class PlotCommands(commands.Cog):
                       draw_is_loss: bool = False):
         """Converts raw Dataframe to Pandas group-by format"""
 
-        data = data.replace(to_replace="x", value="l" if draw_is_loss else "w")
-        data = data.replace(to_replace=["w", "l"], value=["Win", "Loss"])
+        data["winloss"] = data["winloss"].replace(
+            to_replace=["w", "x", "l"],
+            value=["Win", "Loss" if draw_is_loss else "Win", "Loss"]
+        )
+        data["role"] = data["role"].replace(to_replace=["t", "d", "s"],
+                                            value=["Tank", "Damage", "Support"])
+        data["map_type"] = [MAP_TYPES[map] for map in data["map"]]
 
         if mode in ("distribution", "distribution_all"):
             return data  # No processing needed - not split by map
 
         if mode == "ungroup":
             grouped = data.groupby(["map"])["sentiment"]
+        elif mode == "map_type":
+            grouped = data.groupby(["map_type", "winloss"])["sentiment"]
+        elif mode == "role":
+            grouped = data.groupby(["map", "role"])["sentiment"]
         else:
             grouped = data.groupby(["map", "winloss"])["sentiment"]
 
@@ -106,7 +146,7 @@ class PlotCommands(commands.Cog):
             agg = grouped.mean()
             agg = agg.unstack()
             agg = agg.mean(axis=1)
-        elif mode in ("group", "ungroup"):
+        elif mode in ("group", "ungroup", "map_type", "role"):
             agg = grouped.mean()
         elif mode == "count":
             agg = grouped.count()
@@ -124,7 +164,10 @@ class PlotCommands(commands.Cog):
         # The closest-matching theme for Discord (assuming dark mode)
         mpl.style.use("dark_background")
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        if mode == "map_type":
+            fig, ax = plt.subplots(figsize=(8, 6))
+        else:
+            fig, ax = plt.subplots(figsize=(12, 6))
 
         if mode == "normalise" or mode is None:
             sns.barplot(
@@ -150,6 +193,24 @@ class PlotCommands(commands.Cog):
                 y="sentiment",
                 ax=ax,
                 palette="flare_r"
+            )
+        elif mode == "map_type":
+            sns.barplot(
+                data=agg,
+                x="map_type",
+                y="sentiment",
+                ax=ax,
+                hue="winloss",
+                palette=WINLOSS_PALETTE
+            )
+        elif mode == "role":
+            sns.barplot(
+                data=agg,
+                x="map",
+                y="sentiment",
+                ax=ax,
+                hue="role",
+                palette=ROLE_PALETTE
             )
         elif mode == "count":
             sns.barplot(
@@ -190,11 +251,14 @@ class PlotCommands(commands.Cog):
             ax.set_ylim(bottom=0, top=6)
             ax.set_ylabel("Quality")
 
-        if mode in ("group", "count", "distribution", "distribution_all"):
+        if mode in ("group", "map_type", "count", "distribution",
+                    "distribution_all", "role"):
             legend = ax.get_legend()
             if legend is not None:
                 if mode == "distribution_all":
                     legend.set_title("Author")
+                elif mode == "role":
+                    legend.set_title("Role")
                 else:
                     legend.set_title("Win / Loss")
                 legend.get_frame().set_alpha(0)
@@ -203,7 +267,10 @@ class PlotCommands(commands.Cog):
 
         if mode not in ("distribution", "distribution_all"):
             ax.tick_params(axis='x', rotation=45)
-            ax.set_xlabel("Map")
+            if mode == "map_type":
+                ax.set_xlabel("Map Type")
+            else:
+                ax.set_xlabel("Map")
 
         return fig
 
