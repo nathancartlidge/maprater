@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from bot import MapRater
 from commands import BaseCommands
 from plotting import PlotCommands
+from rank_update import UpdateCommand
 from db_handler import DatabaseHandler
 
 if __name__ == "__main__":
@@ -49,5 +50,6 @@ if __name__ == "__main__":
 
     bot.add_cog(BaseCommands(bot.db_handler))
     bot.add_cog(PlotCommands(bot.db_handler))
+    bot.add_cog(UpdateCommand(bot.db_handler))
 
     bot.run(TOKEN)

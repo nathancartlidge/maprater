@@ -8,6 +8,7 @@ from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
+from rank_update import check_update
 
 QUAL = [
     "i should uninstall",
@@ -249,22 +250,22 @@ class VotingButtons(discord.ui.View):
             )
             return
 
-        a = self.partial_votes[user].get("winloss", None)
-        b = self.partial_votes[user].get("role", None)
-        c = self.partial_votes[user].get("quality", None)
+        wl = self.partial_votes[user].get("winloss", None)
+        ro = self.partial_votes[user].get("role", None)
+        qu = self.partial_votes[user].get("quality", None)
 
-        if a is None or b is None or c is None:
+        if wl is None or ro is None or qu is None:
             await interaction.response.send_message(
                 content=":warning: Please fill in all sections!",
                 ephemeral=True
             )
             return
 
-        logging.info("%s voted: %s %s %s %s", user, self.map, a, b, c)
+        logging.info("%s voted: %s %s %s %s", user, self.map, wl, ro, qu)
 
         await self.db_handler.write_line(server_id=interaction.guild_id,
                                          username=user, mapname=self.map,
-                                         result=a, role=b, sentiment=c,
+                                         result=wl, role=ro, sentiment=qu,
                                          datetime=time.time())
 
         self.votes.append(user)
@@ -273,6 +274,7 @@ class VotingButtons(discord.ui.View):
         await interaction.response.edit_message(
             content=f"{self.line}\nVoters: *{voters_line}*")
 
+        await check_update(interaction, user, ro, self.db_handler)
 
 class UndoLast(discord.ui.View):
     """View for the 'undo' button triggered after /last"""

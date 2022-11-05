@@ -7,96 +7,13 @@ import sqlite3
 import aiosqlite
 import pandas as pd
 
-CREATE_USER_TABLE = """
-CREATE TABLE IF NOT EXISTS users (
-    user_id   INTEGER PRIMARY KEY NOT NULL,
-    username  TEXT    UNIQUE NOT NULL
-)
-"""
-
-CREATE_MAPS_TABLE = """
-CREATE TABLE IF NOT EXISTS maps (
-    map_id   INTEGER PRIMARY KEY NOT NULL,
-    map_name TEXT    UNIQUE NOT NULL
-)
-"""
-
-CREATE_DATA_TABLE = """
-CREATE TABLE IF NOT EXISTS ow2 (
-    rating_id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-    author_id INTEGER NOT NULL,
-    map_id    INTEGER NOT NULL,
-    result    CHAR(1) NOT NULL,
-    role      CHAR(1) NOT NULL,
-    sentiment INTEGER NOT NULL,
-    datetime  INTEGER NOT NULL,
-
-    FOREIGN KEY (author_id)
-        REFERENCES users (user_id)
-            ON DELETE CASCADE
-            ON UPDATE NO ACTION,
-    FOREIGN KEY (map_id)
-        REFERENCES maps (map_id)
-            ON DELETE CASCADE
-            ON UPDATE NO ACTION
-)
-"""
-
-SELECT_COUNT = "SELECT COUNT(rating_id) FROM ow2"
-SELECT_ALL_PANDAS = """
-SELECT users.username as author, maps.map_name as map, ow2.result as winloss,
-       ow2.role, ow2.sentiment, datetime(ow2.datetime, 'unixepoch') as time
-    FROM ow2
-        INNER JOIN users ON ow2.author_id = users.user_id
-        INNER JOIN maps ON ow2.map_id = maps.map_id 
-"""
-def SELECT_LAST_N(n: int):
-    """Method to select `n` entries from the dataset"""
-    return f"""
-        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
-            ow2.sentiment, ow2.datetime
-            FROM ow2
-                INNER JOIN users ON ow2.author_id = users.user_id
-                INNER JOIN maps ON ow2.map_id = maps.map_id 
-            ORDER BY rating_id DESC
-            LIMIT {min(20, max(1, int(n))):0d};
-    """
-def SELECT_LAST_N_USERNAME(n: int):
-    """Method to select `n` entries from the dataset, filtering by username"""
-    return f"""
-        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
-            ow2.sentiment, ow2.datetime
-            FROM ow2
-                INNER JOIN users ON ow2.author_id = users.user_id
-                INNER JOIN maps ON ow2.map_id = maps.map_id 
-            WHERE users.username = ?
-            ORDER BY rating_id DESC
-            LIMIT {min(20, max(1, int(n))):0d};
-    """
-
-SELECT_USERID_FROM_USERNAME = "SELECT user_id FROM users WHERE username = ?"
-SELECT_MAPID_FROM_MAPNAME = "SELECT map_id FROM maps WHERE map_name = ?"
-
-def DELETE_N_IDS(n: int):
-    """Method to delete `n` ids from the dataset"""
-    return f"""
-        DELETE FROM ow2
-            WHERE rating_id IN
-                ({', '.join(['?']*n)})
-    """
-
-INSERT_INTO_DATA = """
-INSERT INTO ow2
-    (author_id, map_id, result, role, sentiment, datetime)
-    VALUES (?, ?, ?, ?, ?, ?)
-"""
-INSERT_INTO_USERS = "INSERT INTO users (username) values (?)"
-INSERT_INTO_MAPS = "INSERT INTO maps (map_name) values (?)"
+from queries import *
 
 class DatabaseHandler:
     """A class to manage SQLite databases per-server"""
     def __init__(self, root_dir: str = "") -> None:
         self.root_dir = root_dir
+        self.tables = set()
 
     async def _get_user_id(self, server_id: int, username: str):
         """Gets a user ID from a map name, inserting if not present"""
@@ -134,15 +51,21 @@ class DatabaseHandler:
         """
         makes sure the required tables exist.
         """
+        if server_id in self.tables:
+            return True
+
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()
 
             await cursor.execute(CREATE_USER_TABLE)
             await cursor.execute(CREATE_MAPS_TABLE)
             await cursor.execute(CREATE_DATA_TABLE)
+            await cursor.execute(CREATE_UPDATE_TABLE)
 
             await cursor.close()
             await conn.commit()
+
+        self.tables.add(server_id)
 
     async def write_line(self, server_id: int, username: str, mapname: str,
                          result: str, role: str, sentiment: int,
@@ -163,7 +86,7 @@ class DatabaseHandler:
             await conn.commit()
 
     async def get_last(self, server_id: int, count: int = 1,
-                       username: Optional[str] = None):
+                       username: Optional[str] = None) -> tuple[list, list]:
         """
         gets the last line of data from the file, if present
         """
@@ -173,9 +96,9 @@ class DatabaseHandler:
         if count not in list(range(21)):
             return [], []
 
+        await self._ensure_tables_exist(server_id)
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()
-            await self._ensure_tables_exist(server_id)
 
             # WARN: This does risk SQL injection! However, given the value is a
             #       bounded int, this should not pose much concern
@@ -200,9 +123,9 @@ class DatabaseHandler:
         if len(ids) > 20:
             return
 
+        await self._ensure_tables_exist(server_id)
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()
-            await self._ensure_tables_exist(server_id)
 
             await cursor.execute(DELETE_N_IDS(len(ids)), ids)
             await cursor.close()
@@ -210,9 +133,9 @@ class DatabaseHandler:
 
     async def get_line_count(self, server_id: int):
         """gets the number of (data) lines in the file"""
+        await self._ensure_tables_exist(server_id)
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()
-            await self._ensure_tables_exist(server_id)
 
             await cursor.execute("select count(rating_id) from ow2")
             count = await cursor.fetchone()
@@ -221,6 +144,61 @@ class DatabaseHandler:
             await cursor.close()
 
         return count
+
+    async def _test_rank_update(self, server_id: int, username: str, role: str):
+        """Tests if a rank update is expected"""
+        needs_update = False
+        await self._ensure_tables_exist(server_id)
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
+
+            print(f"\n\n\n{role=}, {username=}\n\n\n")
+            await cursor.execute(CHECK_RANK_UPDATE, (role, username))
+            result = await cursor.fetchall()
+            result_dict = dict(result)
+            loss_count = result_dict.get("l", 0)
+            win_count = result_dict.get("w", 0)
+            if loss_count >= 20:
+                needs_update = True
+            elif win_count >= 7:
+                needs_update = True
+
+            logging.info("%s / %s", loss_count, win_count)
+
+            await cursor.close()
+
+        return needs_update
+
+    async def do_rank_update(self, server_id: int, username: str, role: str,
+                             force: bool = False):
+        """Checks if a rank update is expected, performing one if needed"""
+        needs_update = await self._test_rank_update(server_id, username, role)
+        if needs_update or force:
+            user_id = await self._get_user_id(server_id, username)
+            last_id, _ = await self.get_last(server_id, 1, username)
+            if len(last_id) == 1:
+                last_id = last_id[0]
+
+            else:
+                last_id = -1
+
+            logging.info("last id is %s", last_id)
+
+            result_str = None
+            async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+                cursor = await conn.cursor()
+                await cursor.execute(GET_GAMES_SINCE_UPDATE, (role, user_id))
+                result = "".join(map(lambda x: x[0], await cursor.fetchall()))
+                if result != "":
+                    result_str = result
+
+                await cursor.execute(INSERT_RANK_UPDATES, (user_id, role, last_id, last_id))
+                await cursor.close()
+                await conn.commit()
+
+            return True, result_str
+
+        return False, None
 
     def get_pandas_data(self, server_id: int):
         """
