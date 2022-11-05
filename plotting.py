@@ -20,10 +20,11 @@ from db_handler import DatabaseHandler
 PLOT_DESCRIPTION = {
     "normalise": "Data has been normalised by winrate (equal weight to ratings" \
         + " given from losses as ratings given from wins)",
-    "group": "Data has been separated by map and win/loss",
-    "map_type": "Data has been separated by map type",
+    "winloss": "Data has been separated by map and win/loss",
+    "maptype": "Data has been separated by map type and win/loss",
+    "maptype_role": "Data has been separated by map type and role",
     "role": "Data has been separated by map type and role, not normalised",
-    "ungroup": "Data has been separated by map, but has not been normalised",
+    "average": "Data has been separated by map, but has not been normalised",
     "count": "Data shows the number of ratings per map, separated by win/loss",
     "distribution": "Data shows KDE-smoothed plot of ranking distribution, separated by win/loss",
     "distribution_all": "Data shows KDE-smoothed plot of ranking distribution, separated by voter"
@@ -69,9 +70,9 @@ class PlotCommands(commands.Cog):
     async def plot(self, ctx: ApplicationContext,
                    mode: Option(str, description="What plotting mode should be used?",
                                 default="normalise",
-                                choices=["normalise", "group", "ungroup",
-                                         "map_type", "role", "count",
-                                         "distribution"]),
+                                choices=["normalise", "winloss", "maptype",
+                                         "maptype_role", "role", "average",
+                                         "count", "distribution"]),
                    user: Option(discord.Member, description="Limit data to a particular person",
                                 required=False, default=None)):
         """Creates a plot of the current rating set"""
@@ -133,10 +134,12 @@ class PlotCommands(commands.Cog):
         if mode in ("distribution", "distribution_all"):
             return data  # No processing needed - not split by map
 
-        if mode == "ungroup":
+        if mode == "average":
             grouped = data.groupby(["map"])["sentiment"]
-        elif mode == "map_type":
+        elif mode == "maptype":
             grouped = data.groupby(["map_type", "winloss"])["sentiment"]
+        elif mode == "maptype_role":
+            grouped = data.groupby(["map_type", "role"])["sentiment"]
         elif mode == "role":
             grouped = data.groupby(["map", "role"])["sentiment"]
         else:
@@ -146,7 +149,7 @@ class PlotCommands(commands.Cog):
             agg = grouped.mean()
             agg = agg.unstack()
             agg = agg.mean(axis=1)
-        elif mode in ("group", "ungroup", "map_type", "role"):
+        elif mode in ("winloss", "average", "maptype", "maptype_role", "role"):
             agg = grouped.mean()
         elif mode == "count":
             agg = grouped.count()
@@ -164,7 +167,7 @@ class PlotCommands(commands.Cog):
         # The closest-matching theme for Discord (assuming dark mode)
         mpl.style.use("dark_background")
 
-        if mode == "map_type":
+        if mode == "maptype":
             fig, ax = plt.subplots(figsize=(8, 6))
         else:
             fig, ax = plt.subplots(figsize=(12, 6))
@@ -177,7 +180,7 @@ class PlotCommands(commands.Cog):
                 ax=ax,
                 palette="flare_r"
             )
-        elif mode == "group":
+        elif mode == "winloss":
             sns.barplot(
                 data=agg,
                 x="map",
@@ -186,7 +189,7 @@ class PlotCommands(commands.Cog):
                 hue="winloss",
                 palette=WINLOSS_PALETTE
             )
-        elif mode == "ungroup":
+        elif mode == "average":
             sns.barplot(
                 data=agg,
                 x="map",
@@ -194,7 +197,7 @@ class PlotCommands(commands.Cog):
                 ax=ax,
                 palette="flare_r"
             )
-        elif mode == "map_type":
+        elif mode == "maptype":
             sns.barplot(
                 data=agg,
                 x="map_type",
@@ -207,6 +210,15 @@ class PlotCommands(commands.Cog):
             sns.barplot(
                 data=agg,
                 x="map",
+                y="sentiment",
+                ax=ax,
+                hue="role",
+                palette=ROLE_PALETTE
+            )
+        elif mode == "maptype_role":
+            sns.barplot(
+                data=agg,
+                x="map_type",
                 y="sentiment",
                 ax=ax,
                 hue="role",
@@ -251,13 +263,13 @@ class PlotCommands(commands.Cog):
             ax.set_ylim(bottom=0, top=6)
             ax.set_ylabel("Quality")
 
-        if mode in ("group", "map_type", "count", "distribution",
-                    "distribution_all", "role"):
+        if mode in ("winloss", "maptype", "count", "distribution",
+                    "distribution_all", "role", "maptype_role"):
             legend = ax.get_legend()
             if legend is not None:
                 if mode == "distribution_all":
                     legend.set_title("Author")
-                elif mode == "role":
+                elif mode in ("role", "maptype_role"):
                     legend.set_title("Role")
                 else:
                     legend.set_title("Win / Loss")
@@ -267,7 +279,7 @@ class PlotCommands(commands.Cog):
 
         if mode not in ("distribution", "distribution_all"):
             ax.tick_params(axis='x', rotation=45)
-            if mode == "map_type":
+            if mode in ("maptype", "maptype_role"):
                 ax.set_xlabel("Map Type")
             else:
                 ax.set_xlabel("Map")

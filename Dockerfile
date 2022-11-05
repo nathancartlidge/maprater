@@ -15,4 +15,4 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-CMD ["python", "main.py", "--all-servers"]
+CMD ["python", "main.py"]
