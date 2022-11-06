@@ -86,15 +86,18 @@ class DatabaseHandler:
             await conn.commit()
 
     async def get_last(self, server_id: int, count: int = 1,
-                       username: Optional[str] = None) -> tuple[list, list]:
+                       username: Optional[str] = None,
+                       role: Optional[str] = None) -> tuple[list, list]:
         """
         gets the last line of data from the file, if present
         """
         if not isinstance(count, int):
             return [], []
 
-        if count not in list(range(21)):
+        if count not in list(range(101)):
             return [], []
+
+        role_char = {None: None, "Tank": "t", "Damage": "d", "Support": "s"}[role]
 
         await self._ensure_tables_exist(server_id)
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
@@ -102,10 +105,21 @@ class DatabaseHandler:
 
             # WARN: This does risk SQL injection! However, given the value is a
             #       bounded int, this should not pose much concern
-            if username is None:
-                await cursor.execute(SELECT_LAST_N(count))
+            if username is not None:
+                if role_char is not None:
+                    query = SELECT_LAST_N_USERNAME_ROLE(count)
+                    await cursor.execute(query, (username, role_char))
+                else:
+                    query = SELECT_LAST_N_USERNAME(count)
+                    await cursor.execute(query, (username,))
+
+            elif role_char is not None:
+                query = SELECT_LAST_N_ROLE(count)
+                await cursor.execute(query, (role_char,))
+
             else:
-                await cursor.execute(SELECT_LAST_N_USERNAME(count), (username,))
+                query = SELECT_LAST_N(count)
+                await cursor.execute(query)
 
             result = await cursor.fetchall()
 
@@ -152,7 +166,6 @@ class DatabaseHandler:
         async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
             cursor = await conn.cursor()
 
-            print(f"\n\n\n{role=}, {username=}\n\n\n")
             await cursor.execute(CHECK_RANK_UPDATE, (role, username))
             result = await cursor.fetchall()
             result_dict = dict(result)

@@ -59,7 +59,7 @@ def SELECT_LAST_N(n: int):
                 INNER JOIN users ON ow2.author_id = users.user_id
                 INNER JOIN maps ON ow2.map_id = maps.map_id 
             ORDER BY rating_id DESC
-            LIMIT {min(20, max(1, int(n))):0d};
+            LIMIT {min(100, max(1, int(n))):0d}
     """
 def SELECT_LAST_N_USERNAME(n: int):
     """Method to select `n` entries from the dataset, filtering by username"""
@@ -68,11 +68,37 @@ def SELECT_LAST_N_USERNAME(n: int):
             ow2.sentiment, ow2.datetime
             FROM ow2
                 INNER JOIN users ON ow2.author_id = users.user_id
-                INNER JOIN maps ON ow2.map_id = maps.map_id 
+                INNER JOIN maps ON ow2.map_id = maps.map_id
             WHERE users.username = ?
             ORDER BY rating_id DESC
-            LIMIT {min(20, max(1, int(n))):0d};
+            LIMIT {min(100, max(1, int(n))):0d}
     """
+def SELECT_LAST_N_ROLE(n: int):
+    """Method to select `n` entries from the dataset, filtering by role"""
+    return f"""
+        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
+            ow2.sentiment, ow2.datetime
+            FROM ow2
+                INNER JOIN users ON ow2.author_id = users.user_id
+                INNER JOIN maps ON ow2.map_id = maps.map_id
+            WHERE ow2.role = ?
+            ORDER BY rating_id DESC
+            LIMIT {min(100, max(1, int(n))):0d}
+    """
+def SELECT_LAST_N_USERNAME_ROLE(n: int):
+    """Method to select `n` entries from the dataset, filtering by username and role"""
+    return f"""
+        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.role,
+            ow2.sentiment, ow2.datetime
+            FROM ow2
+                INNER JOIN users ON ow2.author_id = users.user_id
+                INNER JOIN maps ON ow2.map_id = maps.map_id
+            WHERE users.username = ?
+                AND ow2.role = ?
+            ORDER BY rating_id DESC
+            LIMIT {min(100, max(1, int(n))):0d}
+    """
+
 
 GET_GAMES_SINCE_UPDATE = """
 SELECT ow2.result

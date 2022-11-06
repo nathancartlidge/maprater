@@ -69,7 +69,7 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Plot the current data")
     async def plot(self, ctx: ApplicationContext,
                    mode: Option(str, description="What plotting mode should be used?",
-                                default="normalise",
+                                required=True,
                                 choices=["normalise", "winloss", "maptype",
                                          "maptype_role", "role", "average",
                                          "count", "distribution"]),

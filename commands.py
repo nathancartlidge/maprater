@@ -37,9 +37,9 @@ class BaseCommands(commands.Cog):
     @slash_command(description="Get raw data")
     async def data(self, ctx: ApplicationContext,
                    data_format: Option(str, description="Output Data Format",
-                                       default="sqlite", choices=["sqlite", "csv"])):
+                                       required=True, choices=["sqlite", "csv"])):
         """Extracts raw data from the bot"""
-        logging.debug("Getting Raw Data - Invoked by %s", ctx.author)
+        logging.info("Getting Raw Data - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
@@ -121,11 +121,13 @@ class BaseCommands(commands.Cog):
     async def last(
         self, ctx: ApplicationContext,
         count: Option(int, description="Number of entries to return",
-                      min_value=1, max_value=20, default=1),
+                      min_value=1, max_value=100, required=True),
         user: Option(discord.Member, description="Limit to a particular person",
-                     required=False, default=None)):
+                     required=False, default=None),
+        role: Option(str, description="Limit to a particular role",
+                     required=False, default=None, choices=["Tank", "Damage", "Support"])):
         """Prints the last `n` pieces of data to discord, with option to delete"""
-        logging.debug("Getting last %s rows - Invoked by %s",
+        logging.info("Getting last %s rows - Invoked by %s",
                       count, ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
@@ -133,32 +135,60 @@ class BaseCommands(commands.Cog):
 
         username = str(user) if user is not None else None
 
-        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username)
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username, role)
         if len(lines) == 0:
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
         else:
             can_delete = False
             if isinstance(ctx.user, discord.Member) \
-                and ctx.user.guild_permissions.manage_messages:
+                and ctx.user.guild_permissions.manage_messages \
+                    and len(lines) <= 4:
                 can_delete = True
 
-            lines = self._format_lines(lines)
+            lines = self._format_lines(lines, skip_username=username is not None)
             length = len("\n".join(lines))
-            if length > 2000:
-                await ctx.respond(content=":warning: Output too long for discord!" \
-                                          + "You may need to reduce `count`.",
-                                  ephemeral=True)
+
+            if length >= 2000:
+                block = ""
+                index = 0
+                while index < len(lines) \
+                    and len(block + "\n" + lines[index]) < 2000:
+                    block += "\n" + lines[index]
+                    index += 1
+
+                await ctx.respond(content=block, ephemeral=True)
+
+                while index < len(lines):
+                    block = "*(continued)*\n"
+                    while index < len(lines) \
+                        and len(block + "\n" + lines[index]) < 2000:
+                        block += "\n" + lines[index]
+                        index += 1
+
+                    await ctx.followup.send(content=block, ephemeral=True)
+
                 return
 
-            await ctx.respond(
-                content="\n".join(lines),
-                view=UndoLast(lines, ids, self.db_handler, can_delete),
-                ephemeral=True
-            )
+            elif can_delete:
+                # only short responses will need the delete button
+                await ctx.respond(
+                    content="\n".join(lines),
+                    view=UndoLast(lines, ids, self.db_handler, can_delete),
+                    ephemeral=True
+                )
 
-    def _format_lines(self, lines):
+            else:
+                await ctx.respond(
+                    content="\n".join(lines),
+                    ephemeral=True
+                )
+
+
+    def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""
         output = []
+        if skip_username:
+            output.append(f"Data for user `{lines[0][0]}`:")
         for (username, map_name, result, role, sentiment, datetime) in lines:
             result_string = {"w": "🏆", "l": "❌", "x": "🤝"}[result]
             role_string = {"t": "<:Tank:1031299011493249155>",
@@ -166,7 +196,11 @@ class BaseCommands(commands.Cog):
                            "s": "<:Support:1031299004836880384>"}[role]
             sent_string = QUAL[sentiment]
 
-            output.append(f"`{username}`: {result_string} on {role_string} on *{map_name}*"
-                          + f" - *'{sent_string}'* (<t:{datetime}:R>)")
+            if skip_username:
+                output.append(f"`{result_string} on {role_string} on *{map_name}*"
+                            + f" - *'{sent_string}'* (<t:{datetime}:R>)")
+            else:
+                output.append(f"{username}`: {result_string} on {role_string} on *{map_name}*"
+                            + f" - *'{sent_string}'* (<t:{datetime}:R>)")
 
         return output
