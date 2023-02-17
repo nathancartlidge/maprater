@@ -197,10 +197,10 @@ class BaseCommands(commands.Cog):
             sent_string = QUAL[sentiment]
 
             if skip_username:
-                output.append(f"`{result_string} on {role_string} on *{map_name}*"
+                output.append(f"{result_string} on {role_string} on *{map_name}*"
                             + f" - *'{sent_string}'* (<t:{datetime}:R>)")
             else:
-                output.append(f"{username}`: {result_string} on {role_string} on *{map_name}*"
+                output.append(f"`{username}`: {result_string} on {role_string} on *{map_name}*"
                             + f" - *'{sent_string}'* (<t:{datetime}:R>)")
 
         return output

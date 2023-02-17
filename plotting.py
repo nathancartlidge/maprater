@@ -39,6 +39,7 @@ MAP_TYPES = {
     "Rialto": "Payload",
     "R66": "Payload",
     "WPG": "Payload",
+    "Shambali": "Payload",
 
     "Blizzard": "Hybrid",
     "Eichenwalde": "Hybrid",
@@ -52,6 +53,7 @@ MAP_TYPES = {
     "Lijiang": "Control",
     "Nepal": "Control",
     "Oasis": "Control",
+    "Antarctic": "Control",
 
     "QueenStreet": "Push",
     "Esperanca": "Push",

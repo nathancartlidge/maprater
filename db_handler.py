@@ -186,32 +186,32 @@ class DatabaseHandler:
                              force: bool = False):
         """Checks if a rank update is expected, performing one if needed"""
         needs_update = await self._test_rank_update(server_id, username, role)
-        if needs_update or force:
-            user_id = await self._get_user_id(server_id, username)
-            last_id, _ = await self.get_last(server_id, 1, username)
-            if len(last_id) == 1:
-                last_id = last_id[0]
+        user_id = await self._get_user_id(server_id, username)
+        last_id, _ = await self.get_last(server_id, 1, username)
+        if len(last_id) == 1:
+            last_id = last_id[0]
+        else:
+            last_id = -1
 
-            else:
-                last_id = -1
+        logging.info("last id is %s", last_id)
 
-            logging.info("last id is %s", last_id)
+        result_str = None
+        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+            cursor = await conn.cursor()
+            await cursor.execute(GET_GAMES_SINCE_UPDATE, (role, user_id))
+            result = "".join(map(lambda x: x[0], await cursor.fetchall()))
+            if result != "":
+                result_str = result
 
-            result_str = None
-            async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
-                cursor = await conn.cursor()
-                await cursor.execute(GET_GAMES_SINCE_UPDATE, (role, user_id))
-                result = "".join(map(lambda x: x[0], await cursor.fetchall()))
-                if result != "":
-                    result_str = result
-
+            if needs_update or force:
                 await cursor.execute(INSERT_RANK_UPDATES, (user_id, role, last_id, last_id))
-                await cursor.close()
+
+            await cursor.close()
+
+            if needs_update or force:
                 await conn.commit()
 
-            return True, result_str
-
-        return False, None
+        return needs_update or force, result_str
 
     def get_pandas_data(self, server_id: int):
         """

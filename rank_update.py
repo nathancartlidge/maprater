@@ -16,13 +16,17 @@ class UpdateCommand(discord.Cog):
         super().__init__()
         self.db_handler = db_handler
 
-    @slash_command(description="Force a rank update")
+    @slash_command(description="Rank update information")
     async def rank_update(self, ctx: ApplicationContext,
                           role: Option(str, description="The role to update",
                                        choices=["Tank", "Damage", "Support"],
-                                       required=True)):
+                                       required=True),
+                          reset: Option(bool, description="Force a rank update?",
+                                        choices=[True, False], default=False)):
         """A manual rank update"""
-        logging.debug("Forcing a rank update on %s for %s", role, ctx.user)
+        if reset:
+            logging.info("Forcing a rank update on %s for %s", role, ctx.user)
+
         role_char = {"Tank": "t", "Damage": "d", "Support": "s"}[role]
 
         if ctx.guild_id is None:
@@ -30,16 +34,21 @@ class UpdateCommand(discord.Cog):
             return
 
         _, string = await self.db_handler.do_rank_update(ctx.guild_id, str(ctx.user),
-                                                         role_char, force=True)
+                                                         role_char, force=reset)
         if string is None:
-            await ctx.respond(f"Rank Update tracking enabled for {role}!", ephemeral=True)
+            if reset:
+                await ctx.respond(f"Rank Update tracking enabled for {role}!", ephemeral=True)
+            else:
+                await ctx.respond(f"No known rank update for {role} - have you started tracking?",
+                                  ephemeral=True)
         else:
-            string = UpdateCommand.format_update(role_char, string)
-            string += "\n> please rank all your games!"
+            string = UpdateCommand.format_update(role_char, string, reset)
+            if reset:
+                string += "\n> please rank all your games!"
             await ctx.respond(string, ephemeral=True)
 
     @staticmethod
-    def format_update(role: str, result: str):
+    def format_update(role: str, result: str, is_final: bool = False):
         """Formats update strings nicely"""
         lines = []
 
@@ -52,7 +61,10 @@ class UpdateCommand(discord.Cog):
         if win_count < 7 and loss_count > win_count:
             update_emoji = "📉"
 
-        lines.append(f"{role_emoji} **Rank Update!**")
+        if is_final:
+            lines.append(f"{role_emoji} **Rank Update!**")
+        else:
+            lines.append(f"{role_emoji} **Rank Update So Far:**")
 
         result_emoji = result.replace("w", "🏆").replace("x", "🤝").replace("l", "❌")
         lines.append(f"{update_emoji}: {result_emoji}")
@@ -61,8 +73,10 @@ class UpdateCommand(discord.Cog):
         div = round(sr/100)
         divisions = ((f"lost {div} division(s)", f"gained {div} division(s)")[div > 0],
                       "same division")[round(sr/100) == 0]
-        lines.append(f"{win_count} win(s) and {loss_count} loss(es)"
-                     + f" - `{sr:+}sr` / *{divisions}*")
+        win_word = ("win", "wins")[win_count != 1]
+        loss_word = ("loss", "losses")[loss_count != 1]
+        lines.append(f"{win_count} {win_word} and {loss_count} {loss_word}")
+        lines.append(f"Expected Outcome: *{divisions}* (`{sr:+}sr`)")
 
         return "\n".join(lines)
 
@@ -72,6 +86,6 @@ async def check_update(interaction: Interaction, username: str,
     updated, wl_string = await db_handler.do_rank_update(interaction.guild_id,
                                                          username, role)
     if updated:
-        string = UpdateCommand.format_update(role, wl_string)
+        string = UpdateCommand.format_update(role, wl_string, is_final=True)
         string += ALIGNMENT_UPDATE
         await interaction.followup.send(string, ephemeral=True)

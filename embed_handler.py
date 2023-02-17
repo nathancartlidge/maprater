@@ -71,13 +71,18 @@ class MapButtons(discord.ui.View):
     async def _R66(self, _, interaction):
         await self._callback("R66", interaction)
 
-    @discord.ui.button(label="WP: Gibraltar", custom_id="WPG",
+    @discord.ui.button(label="WP:G", custom_id="WPG",
                        style=ButtonStyle.red, row=1)
     async def _WPG(self, _, interaction):
         await self._callback("WPG", interaction)
 
+    @discord.ui.button(label="Shambali", custom_id="Shambali",
+                       style=ButtonStyle.red, row=1)
+    async def _Shambali(self, _, interaction):
+        await self._callback("Shambali", interaction)
 
-    @discord.ui.button(label="Blizzard World", custom_id="Blizzard",
+
+    @discord.ui.button(label="Blizzard", custom_id="Blizzard",
                        style=ButtonStyle.blurple, row=1)
     async def _Blizzard(self, _, interaction):
         await self._callback("Blizzard", interaction)
@@ -117,7 +122,7 @@ class MapButtons(discord.ui.View):
     async def _Ilios(self, _, interaction):
         await self._callback("Ilios", interaction)
 
-    @discord.ui.button(label="Lijiang Tower", custom_id="Lijiang",
+    @discord.ui.button(label="Lijiang", custom_id="Lijiang",
                        style=ButtonStyle.green, row=3)
     async def _Lijang(self, _, interaction):
         await self._callback("Lijiang", interaction)
@@ -131,6 +136,11 @@ class MapButtons(discord.ui.View):
                        style=ButtonStyle.green, row=3)
     async def _Oasis(self, _, interaction):
         await self._callback("Oasis", interaction)
+
+    @discord.ui.button(label="Antarctic", custom_id="Antarctic",
+                       style=ButtonStyle.green, row=4)
+    async def _Oasis(self, _, interaction):
+        await self._callback("Antarctic", interaction)
 
 
     @discord.ui.button(label="New Queen Street", custom_id="QueenStreet",
