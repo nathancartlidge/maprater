@@ -1,7 +1,10 @@
-# OW Map Rater
+# Overwatch Map Rater
 An attempt to discover the most painful overwatch map, alongside other data!
 
+<!---
+unfortunately, the server providing hosting has been shut down
 [Add to your server](https://discord.com/api/oauth2/authorize?client_id=1027923329333608458&permissions=277025695744&scope=bot%20applications.commands)
+--->
 
 ## Self-hosting
 I have hosted the bot on a fly.io instance - with `flyctl` set up, the
