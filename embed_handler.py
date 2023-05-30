@@ -41,6 +41,7 @@ class MapButtons(discord.ui.View):
         )
 
     # auto-generated functions, probably a better way of doing this
+    # Payload
     @discord.ui.button(label="Circuit Royal", custom_id="Circuit",
                        style=ButtonStyle.red, row=0)
     async def _Circuit(self, _, interaction):
@@ -81,7 +82,7 @@ class MapButtons(discord.ui.View):
     async def _Shambali(self, _, interaction):
         await self._callback("Shambali", interaction)
 
-
+    # Hybrid
     @discord.ui.button(label="Blizzard", custom_id="Blizzard",
                        style=ButtonStyle.blurple, row=1)
     async def _Blizzard(self, _, interaction):
@@ -112,6 +113,12 @@ class MapButtons(discord.ui.View):
     async def _Paraiso(self, _, interaction):
         await self._callback("Paraiso", interaction)
 
+    @discord.ui.button(label="Numbani", custom_id="Numbani",
+                       style=ButtonStyle.blurple, row=2)
+    async def _Numbani(self, _, interaction):
+        await self._callback("Numbani", interaction)
+
+    # Control
     @discord.ui.button(label="Busan", custom_id="Busan",
                        style=ButtonStyle.green, row=3)
     async def _Busan(self, _, interaction):
@@ -139,10 +146,10 @@ class MapButtons(discord.ui.View):
 
     @discord.ui.button(label="Antarctic", custom_id="Antarctic",
                        style=ButtonStyle.green, row=4)
-    async def _Oasis(self, _, interaction):
+    async def _Antarctic(self, _, interaction):
         await self._callback("Antarctic", interaction)
 
-
+    # Push
     @discord.ui.button(label="New Queen Street", custom_id="QueenStreet",
                        style=ButtonStyle.grey, row=4)
     async def _QueenStreet(self, _, interaction):

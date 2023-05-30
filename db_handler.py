@@ -171,9 +171,9 @@ class DatabaseHandler:
             result_dict = dict(result)
             loss_count = result_dict.get("l", 0)
             win_count = result_dict.get("w", 0)
-            if loss_count >= 20:
+            if loss_count >= 15:
                 needs_update = True
-            elif win_count >= 7:
+            elif win_count >= 5:
                 needs_update = True
 
             logging.info("%s / %s", loss_count, win_count)

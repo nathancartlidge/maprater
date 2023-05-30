@@ -58,7 +58,7 @@ class UpdateCommand(discord.Cog):
         win_count = result.count("w")
         loss_count = result.count("l")
         update_emoji = "📈"
-        if win_count < 7 and loss_count > win_count:
+        if win_count < 5 and loss_count > win_count:
             update_emoji = "📉"
 
         if is_final:
