@@ -11,21 +11,23 @@ from db_handler import DatabaseHandler
 from rank_update import check_update
 
 QUAL = [
-    "i should uninstall",
-    "bad",
-    "mediocre",
-    "ok",
-    "decent",
-    "gg!",
-    "i should reinstall"
+    "I should uninstall",
+    "Bad",
+    "Mediocre",
+    "OK",
+    "Decent",
+    "GG!",
+    "I should reinstall"
 ]
 
 TTL = 60
 
+
 class MapButtons(discord.ui.View):
     """Persistent map rating buttons"""
+
     def __init__(self, db_handler):
-        super().__init__(timeout=None) # timeout of the view must be set to None
+        super().__init__(timeout=None)  # timeout of the view must be set to None
         self.db_handler = db_handler
 
     async def _callback(self, map_name, interaction: Interaction):
@@ -40,134 +42,35 @@ class MapButtons(discord.ui.View):
             delete_after=TTL
         )
 
-    # auto-generated functions, probably a better way of doing this
-    # Payload
-    @discord.ui.button(label="Circuit Royal", custom_id="Circuit",
+    @discord.ui.button(label="Push", custom_id="Push",
                        style=ButtonStyle.red, row=0)
-    async def _Circuit(self, _, interaction):
-        await self._callback("Circuit", interaction)
+    async def _Push(self, _, interaction):
+        await self._callback("Push", interaction)
 
-    @discord.ui.button(label="Dorado", custom_id="Dorado",
+    @discord.ui.button(label="Payload", custom_id="Payload",
+                       style=ButtonStyle.grey, row=0)
+    async def _Payload(self, _, interaction):
+        await self._callback("Payload", interaction)
+
+    @discord.ui.button(label="Hybrid", custom_id="Hybrid",
                        style=ButtonStyle.red, row=0)
-    async def _Dorado(self, _, interaction):
-        await self._callback("Dorado", interaction)
+    async def _Hybrid(self, _, interaction):
+        await self._callback("Hybrid", interaction)
 
-    @discord.ui.button(label="Havana", custom_id="Havana",
+    @discord.ui.button(label="Control", custom_id="Control",
+                       style=ButtonStyle.grey, row=0)
+    async def _Control(self, _, interaction):
+        await self._callback("Control", interaction)
+
+    @discord.ui.button(label="Flashpoint", custom_id="Flashpoint",
                        style=ButtonStyle.red, row=0)
-    async def _Havana(self, _, interaction):
-        await self._callback("Havana", interaction)
-
-    @discord.ui.button(label="Junkertown", custom_id="Junkertown",
-                       style=ButtonStyle.red, row=0)
-    async def _Junkertown(self, _, interaction):
-        await self._callback("Junkertown", interaction)
-
-    @discord.ui.button(label="Rialto", custom_id="Rialto",
-                       style=ButtonStyle.red, row=0)
-    async def _Rialto(self, _, interaction):
-        await self._callback("Rialto", interaction)
-
-    @discord.ui.button(label="Route 66", custom_id="R66",
-                       style=ButtonStyle.red, row=1)
-    async def _R66(self, _, interaction):
-        await self._callback("R66", interaction)
-
-    @discord.ui.button(label="WP:G", custom_id="WPG",
-                       style=ButtonStyle.red, row=1)
-    async def _WPG(self, _, interaction):
-        await self._callback("WPG", interaction)
-
-    @discord.ui.button(label="Shambali", custom_id="Shambali",
-                       style=ButtonStyle.red, row=1)
-    async def _Shambali(self, _, interaction):
-        await self._callback("Shambali", interaction)
-
-    # Hybrid
-    @discord.ui.button(label="Blizzard", custom_id="Blizzard",
-                       style=ButtonStyle.blurple, row=1)
-    async def _Blizzard(self, _, interaction):
-        await self._callback("Blizzard", interaction)
-
-    @discord.ui.button(label="Eichenwalde", custom_id="Eichenwalde",
-                       style=ButtonStyle.blurple, row=1)
-    async def _Eichenwalde(self, _, interaction):
-        await self._callback("Eichenwalde", interaction)
-
-    @discord.ui.button(label="Hollywood", custom_id="Hollywood",
-                       style=ButtonStyle.blurple, row=2)
-    async def _Hollywood(self, _, interaction):
-        await self._callback("Hollywood", interaction)
-
-    @discord.ui.button(label="King's Row", custom_id="Kings",
-                       style=ButtonStyle.blurple, row=2)
-    async def _Kings(self, _, interaction):
-        await self._callback("Kings", interaction)
-
-    @discord.ui.button(label="Midtown", custom_id="Midtown",
-                       style=ButtonStyle.blurple, row=2)
-    async def _Midtown(self, _, interaction):
-        await self._callback("Midtown", interaction)
-
-    @discord.ui.button(label="Paraíso", custom_id="Paraiso",
-                       style=ButtonStyle.blurple, row=2)
-    async def _Paraiso(self, _, interaction):
-        await self._callback("Paraiso", interaction)
-
-    @discord.ui.button(label="Numbani", custom_id="Numbani",
-                       style=ButtonStyle.blurple, row=2)
-    async def _Numbani(self, _, interaction):
-        await self._callback("Numbani", interaction)
-
-    # Control
-    @discord.ui.button(label="Busan", custom_id="Busan",
-                       style=ButtonStyle.green, row=3)
-    async def _Busan(self, _, interaction):
-        await self._callback("Busan", interaction)
-
-    @discord.ui.button(label="Ilios", custom_id="Ilios",
-                       style=ButtonStyle.green, row=3)
-    async def _Ilios(self, _, interaction):
-        await self._callback("Ilios", interaction)
-
-    @discord.ui.button(label="Lijiang", custom_id="Lijiang",
-                       style=ButtonStyle.green, row=3)
-    async def _Lijang(self, _, interaction):
-        await self._callback("Lijiang", interaction)
-
-    @discord.ui.button(label="Nepal", custom_id="Nepal",
-                       style=ButtonStyle.green, row=3)
-    async def _Nepal(self, _, interaction):
-        await self._callback("Nepal", interaction)
-
-    @discord.ui.button(label="Oasis", custom_id="Oasis",
-                       style=ButtonStyle.green, row=3)
-    async def _Oasis(self, _, interaction):
-        await self._callback("Oasis", interaction)
-
-    @discord.ui.button(label="Antarctic", custom_id="Antarctic",
-                       style=ButtonStyle.green, row=4)
-    async def _Antarctic(self, _, interaction):
-        await self._callback("Antarctic", interaction)
-
-    # Push
-    @discord.ui.button(label="New Queen Street", custom_id="QueenStreet",
-                       style=ButtonStyle.grey, row=4)
-    async def _QueenStreet(self, _, interaction):
-        await self._callback("QueenStreet", interaction)
-
-    @discord.ui.button(label="Esperança", custom_id="Esperanca",
-                       style=ButtonStyle.grey, row=4)
-    async def _Esperanca(self, _, interaction):
-        await self._callback("Esperanca", interaction)
-
-    @discord.ui.button(label="Colosseo", custom_id="Colosseo",
-                       style=ButtonStyle.grey, row=4)
-    async def _Colosseo(self, _, interaction):
-        await self._callback("Colosseo", interaction)
+    async def _Flashpoint(self, _, interaction):
+        await self._callback("Flashpoint", interaction)
 
 
 class VotingButtons(discord.ui.View):
     """Provides the initialised voting buttons"""
+
     def __init__(self, line, voted_map, db_handler: DatabaseHandler):
         super().__init__()
         self.line = line
@@ -184,18 +87,17 @@ class VotingButtons(discord.ui.View):
         self.partial_votes[user]["winloss"] = result
         await interaction.response.defer(ephemeral=True, invisible=True)
 
-    @discord.ui.button(label="win", style=ButtonStyle.green, row=0)
+    @discord.ui.button(label="Win", style=ButtonStyle.green, row=0)
     async def _win(self, _, interaction):
         await self._result("w", interaction)
 
-    @discord.ui.button(label="draw", style=ButtonStyle.grey, row=0)
+    @discord.ui.button(label="Draw", style=ButtonStyle.grey, row=0)
     async def _draw(self, _, interaction):
         await self._result("x", interaction)
 
-    @discord.ui.button(label="loss", style=ButtonStyle.red, row=0)
+    @discord.ui.button(label="Loss", style=ButtonStyle.red, row=0)
     async def _loss(self, _, interaction):
         await self._result("l", interaction)
-
 
     async def _role(self, role, interaction: Interaction):
         logging.info("role - %s by %s", role, interaction.user)
@@ -205,18 +107,17 @@ class VotingButtons(discord.ui.View):
         self.partial_votes[user]["role"] = role
         await interaction.response.defer(ephemeral=True, invisible=True)
 
-    @discord.ui.button(label="tank", style=ButtonStyle.grey, row=1)
+    @discord.ui.button(label="Tank", style=ButtonStyle.grey, row=1)
     async def _tank(self, _, interaction):
         await self._role("t", interaction)
 
-    @discord.ui.button(label="damage", style=ButtonStyle.grey, row=1)
+    @discord.ui.button(label="Damage", style=ButtonStyle.grey, row=1)
     async def _damage(self, _, interaction):
         await self._role("d", interaction)
 
-    @discord.ui.button(label="support", style=ButtonStyle.grey, row=1)
+    @discord.ui.button(label="Support", style=ButtonStyle.grey, row=1)
     async def _support(self, _, interaction):
         await self._role("s", interaction)
-
 
     async def _quality(self, quality, interaction: Interaction):
         logging.info("quality - %s by %s", quality, interaction.user)
@@ -253,7 +154,6 @@ class VotingButtons(discord.ui.View):
     @discord.ui.button(label=QUAL[0], style=ButtonStyle.red, row=3)
     async def _q0(self, _, interaction):
         await self._quality(0, interaction)
-
 
     @discord.ui.button(label="Submit", style=ButtonStyle.blurple, row=4)
     async def _submit(self, _, interaction: Interaction):
@@ -293,8 +193,10 @@ class VotingButtons(discord.ui.View):
 
         await check_update(interaction, user, ro, self.db_handler)
 
+
 class UndoLast(discord.ui.View):
     """View for the 'undo' button triggered after /last"""
+
     def __init__(self, lines, ids: list[int], db_handler: DatabaseHandler,
                  can_delete: bool = False) -> None:
         super().__init__()

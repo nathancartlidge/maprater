@@ -1,34 +1,36 @@
-# fly.toml file generated for maprater on 2022-09-02T17:13:38+01:00
+# fly.toml app configuration file generated for maprater on 2023-10-12T22:04:36+01:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
 app = "maprater"
-
+primary_region = "lhr"
 kill_signal = "SIGINT"
-kill_timeout = 5
-processes = []
+kill_timeout = "5s"
+
+[experimental]
+  auto_rollback = true
 
 [env]
   PORT = "8080"
 
-[mounts]
-source = "maprater_data"
-destination = "/data"
+[processes]
+  app = ""
 
-[experimental]
-  allowed_public_ports = []
-  auto_rollback = true
+[[mounts]]
+  source = "maprater_data"
+  destination = "/data"
+  processes = ["app"]
 
 [[services]]
-  http_checks = []
-  internal_port = 8000
-  processes = ["python"]
   protocol = "tcp"
-  script_checks = []
+  internal_port = 8000
+  processes = ["app"]
 
   [[services.ports]]
+    port = 80
     handlers = ["http"]
-    port = "80"
-
   [services.concurrency]
+    type = "connections"
     hard_limit = 25
     soft_limit = 20
-    type = "connections"

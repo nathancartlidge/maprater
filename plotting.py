@@ -40,6 +40,7 @@ MAP_TYPES = {
     "R66": "Payload",
     "WPG": "Payload",
     "Shambali": "Payload",
+    "Payload": "Payload",
 
     "Blizzard": "Hybrid",
     "Eichenwalde": "Hybrid",
@@ -47,6 +48,8 @@ MAP_TYPES = {
     "Kings": "Hybrid",
     "Midtown": "Hybrid",
     "Paraiso": "Hybrid",
+    "Numbani": "Hybrid",
+    "Hybrid": "Hybrid",
 
     "Busan": "Control",
     "Ilios": "Control",
@@ -54,10 +57,14 @@ MAP_TYPES = {
     "Nepal": "Control",
     "Oasis": "Control",
     "Antarctic": "Control",
+    "Control": "Control",
 
     "QueenStreet": "Push",
     "Esperanca": "Push",
-    "Colosseo": "Push"
+    "Colosseo": "Push",
+    "Push": "Push",
+
+    "Flashpoint": "Flashpoint"
 }
 
 mpl.use("agg")  # force non-interactive backend
