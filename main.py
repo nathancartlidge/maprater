@@ -8,12 +8,10 @@ from dotenv import load_dotenv
 
 from bot import MapRater
 from commands import BaseCommands
-from plotting import PlotCommands
 from rank_update import UpdateCommand
-from db_handler import DatabaseHandler
+from data.handler import DatabaseHandler
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action="store_true", default=False)
     parser.add_argument("-v", "--verbose", action="store_true", default=False)
@@ -54,7 +52,6 @@ if __name__ == "__main__":
             await ctx.respond(f"pong! [{round(bot.latency, 2)}s]", ephemeral=True)
 
     bot.add_cog(BaseCommands(bot.db_handler))
-    bot.add_cog(PlotCommands(bot.db_handler))
     bot.add_cog(UpdateCommand(bot.db_handler))
 
     bot.run(TOKEN)

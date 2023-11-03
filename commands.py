@@ -9,12 +9,14 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 import pandas as pd
 
-from embed_handler import QUAL, MapButtons, UndoLast
-from db_handler import DatabaseHandler
+from definitions import ICONS, Roles
+from embed_handler import ResultButtons, UndoLast
+from data.handler import DatabaseHandler
 
 
 class BaseCommands(commands.Cog):
     """Basic commands used for bot"""
+
     def __init__(self, db_handler: DatabaseHandler):
         self.db_handler = db_handler
 
@@ -30,14 +32,12 @@ class BaseCommands(commands.Cog):
 
         logging.info("Created buttons - Invoked by %s", ctx.author)
         await ctx.respond(
-            content="Select a map to vote on:",
-            view=MapButtons(self.db_handler)
+            content="*over-sr-watch*",
+            view=ResultButtons(self.db_handler)
         )
 
     @slash_command(description="Get raw data")
-    async def data(self, ctx: ApplicationContext,
-                   data_format: Option(str, description="Output Data Format",
-                                       required=True, choices=["sqlite", "csv"])):
+    async def data(self, ctx: ApplicationContext):
         """Extracts raw data from the bot"""
         logging.info("Getting Raw Data - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -50,15 +50,8 @@ class BaseCommands(commands.Cog):
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
             return
 
-        if data_format == "sqlite" or data_format is None:
-            path = f"{self.db_handler.root_dir}{ctx.guild_id}.db"
-            file = discord.File(fp=path, filename="data.db")
-        else:
-            pd_data = self.db_handler.get_pandas_data(ctx.guild_id)
-            buffer = BytesIO()
-            pd_data.to_csv(buffer, index=False)
-            buffer.seek(0)
-            file = discord.File(fp=buffer, filename="data.csv")
+        path = self.db_handler.file(ctx.guild_id)
+        file = discord.File(fp=path, filename="data.db")
 
         await ctx.respond(
             content=f"{lines} entries",
@@ -66,69 +59,18 @@ class BaseCommands(commands.Cog):
             ephemeral=True
         )
 
-    @slash_command(description="Describe dataset (summary statistics)")
-    async def describe(self, ctx: ApplicationContext,
-                       user: Option(discord.Member,
-                                    description="Limit data to a particular person",
-                                    required=False, default=None)):
-        """Prints a text description of the data"""
-        logging.info("Describing file - invoked by %s", ctx.author)
-        lines = await self.db_handler.get_line_count(ctx.guild_id)
-
-        if lines < 1:
-            await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
-            return
-
-        data = self.db_handler.get_pandas_data(ctx.guild_id)
-
-        if user is not None:
-            data = data[data.author == str(user)]
-
-        if data.shape[0] == 0:
-            await ctx.respond(content=":warning: No ratings found for that user!", ephemeral=True)
-            return
-
-        data.replace(to_replace={"l": "Loss", "w": "Win", "x": "Draw"}, inplace=True)
-
-        def _process(data: pd.DataFrame, column: pd.Series):
-            grouped = data.groupby([column]).describe()["sentiment"]
-            grouped = grouped[["count", "mean", "std"]]
-            grouped["count"] = grouped["count"].astype(int)
-            grouped.index.rename("result", inplace=True)
-            grouped.rename(columns={"count": "count", "mean": "mean",
-                                    "std": "stdev"}, inplace=True)
-            grouped = grouped.round(decimals=3)
-            return grouped
-
-        def _prettytable(data: pd.Series):
-            string = str(data).splitlines()
-            spaces = len(string[0]) - len(string[0].lstrip(" ")) - 1
-            string.insert(2, "─"*len(string[0]))
-            for i, line in enumerate(string):
-                char = "│" if i != 2 else "┼"
-                string[i] = line[0:spaces] + char + line[spaces:]
-            return "\n".join(string)
-
-        grouped_winloss = _prettytable(_process(data, data.winloss))
-        line = f"```c\n{grouped_winloss}```"
-        if user is None:
-            grouped_author = _prettytable(_process(data, data.author))
-            line += f"```c\n{grouped_author}```"
-
-        await ctx.respond(content=line, ephemeral=True)
-
     @slash_command(description="Get the last n rows of data")
     async def last(
-        self, ctx: ApplicationContext,
-        count: Option(int, description="Number of entries to return",
-                      min_value=1, max_value=100, required=True),
-        user: Option(discord.Member, description="Limit to a particular person",
-                     required=False, default=None),
-        role: Option(str, description="Limit to a particular role",
-                     required=False, default=None, choices=["Tank", "Damage", "Support"])):
+            self, ctx: ApplicationContext,
+            count: Option(int, description="Number of entries to return",
+                          min_value=1, max_value=100, required=True),
+            user: Option(discord.Member, description="Limit to a particular person",
+                         required=False, default=None),
+            role: Option(str, description="Limit to a particular role",
+                         required=False, default=None, choices=["Tank", "Damage", "Support"])):
         """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.info("Getting last %s rows - Invoked by %s",
-                      count, ctx.author)
+                     count, ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
@@ -141,7 +83,7 @@ class BaseCommands(commands.Cog):
         else:
             can_delete = False
             if isinstance(ctx.user, discord.Member) \
-                and ctx.user.guild_permissions.manage_messages \
+                    and ctx.user.guild_permissions.manage_messages \
                     and len(lines) <= 4:
                 can_delete = True
 
@@ -152,7 +94,7 @@ class BaseCommands(commands.Cog):
                 block = ""
                 index = 0
                 while index < len(lines) \
-                    and len(block + "\n" + lines[index]) < 2000:
+                        and len(block + "\n" + lines[index]) < 2000:
                     block += "\n" + lines[index]
                     index += 1
 
@@ -161,7 +103,7 @@ class BaseCommands(commands.Cog):
                 while index < len(lines):
                     block = "*(continued)*\n"
                     while index < len(lines) \
-                        and len(block + "\n" + lines[index]) < 2000:
+                            and len(block + "\n" + lines[index]) < 2000:
                         block += "\n" + lines[index]
                         index += 1
 
@@ -183,24 +125,39 @@ class BaseCommands(commands.Cog):
                     ephemeral=True
                 )
 
+    @slash_command(description="Get your current SR")
+    async def get_sr(self, ctx: ApplicationContext):
+        output = ""
+        for role in Roles:
+            sr = await self.db_handler.get_sr(ctx.guild_id, ctx.user.name, role)
+            output += f"{ICONS[role]}: `{sr}sr`\n"
+        await ctx.respond(content=output, ephemeral=True)
+
+    @slash_command(description="Set your current SR for a role")
+    async def set_sr(
+            self, ctx: ApplicationContext,
+            role: Option(str, description="Role to set", choices=["Tank", "Damage", "Support"]),
+            value: Option(int, description="Current SR", min_value=0, max_value=5000)
+    ):
+        role = Roles[role.upper()]
+        await self.db_handler.set_sr(ctx.guild_id, ctx.user.name, role, value)
+        await ctx.respond(content=f"Set {ICONS[role]} SR to `{value}`", ephemeral=True)
 
     def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""
         output = []
         if skip_username:
             output.append(f"Data for user `{lines[0][0]}`:")
-        for (username, map_name, result, role, sentiment, datetime) in lines:
-            result_string = {"w": "🏆", "l": "❌", "x": "🤝"}[result]
-            role_string = {"t": "<:Tank:1031299011493249155>",
-                           "d": "<:Damage:1031299007793864734>",
-                           "s": "<:Support:1031299004836880384>"}[role]
-            sent_string = QUAL[sentiment]
+        for (username, result, role, datetime) in lines:
+            # todo: cleanup into definitions
+            result_string = {"W": "🏆", "L": "❌", "D": "🤝"}[result]
+            role_string = {"T": "<:Tank:1031299011493249155>",
+                           "D": "<:Damage:1031299007793864734>",
+                           "S": "<:Support:1031299004836880384>"}[role]
 
             if skip_username:
-                output.append(f"{result_string} on {role_string} on *{map_name}*"
-                            + f" - *'{sent_string}'* (<t:{datetime}:R>)")
+                output.append(f"{result_string} on {role_string} (<t:{datetime}:R>)")
             else:
-                output.append(f"`{username}`: {result_string} on {role_string} on *{map_name}*"
-                            + f" - *'{sent_string}'* (<t:{datetime}:R>)")
+                output.append(f"`{username}`: {result_string} on {role_string} (<t:{datetime}:R>)")
 
         return output
