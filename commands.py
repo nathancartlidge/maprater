@@ -154,7 +154,6 @@ class BaseCommands(commands.Cog):
         else:
             await ctx.respond(content=f"Using '{name}' identity", ephemeral=True)
 
-
     def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""
         output = []
@@ -170,6 +169,6 @@ class BaseCommands(commands.Cog):
             if skip_username:
                 output.append(f"{result_string} on {role_string} (<t:{datetime}:R>)")
             else:
-                output.append(f"`{username}`: {result_string} on {role_string} (<t:{datetime}:R>)")
+                output.append(f"`{username.replace('--', ' as ')}`: {result_string} on {role_string} (<t:{datetime}:R>)")
 
         return output

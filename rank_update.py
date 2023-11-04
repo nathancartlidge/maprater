@@ -30,14 +30,14 @@ class UpdateCommand(discord.Cog):
         if reset:
             logging.info("Forcing a rank update on %s for %s", role, ctx.user)
 
-        role_char = {"Tank": "t", "Damage": "d", "Support": "s"}[role]
+        role_enum = {"Tank": Roles.TANK, "Damage": Roles.DAMAGE, "Support": Roles.SUPPORT}[role]
 
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
         _, string = await self.db_handler.do_rank_update(ctx.guild_id, str(ctx.user),
-                                                         role_char, force=reset)
+                                                         role_enum, force=reset)
         if string is None:
             if reset:
                 await ctx.respond(f"Rank Update tracking enabled for {role}!", ephemeral=True)
@@ -45,7 +45,7 @@ class UpdateCommand(discord.Cog):
                 await ctx.respond(f"No known rank update for {role} - have you started tracking?",
                                   ephemeral=True)
         else:
-            string = UpdateCommand.format_update(role_char, string, reset)
+            string, _ = UpdateCommand.format_update(role_enum, string, reset)
             if reset:
                 string += "\n> please rank all your games!"
             await ctx.respond(string, ephemeral=True)
