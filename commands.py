@@ -77,7 +77,7 @@ class BaseCommands(commands.Cog):
 
         username = user.name if user is not None else None
 
-        role_enum = {"Tank": Roles.TANK, "Damage": Roles.DAMAGE, "Support": Roles.SUPPORT}[role]
+        role_enum = {"Tank": Roles.TANK, "Damage": Roles.DAMAGE, "Support": Roles.SUPPORT}.get(role, None)
         ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username, role_enum)
 
         if len(lines) == 0:
@@ -154,7 +154,7 @@ class BaseCommands(commands.Cog):
         if name is None:
             await ctx.respond(content=f"Using default identity", ephemeral=True)
         else:
-            await ctx.respond(content=f"Using '{name}' identity", ephemeral=True)
+            await ctx.respond(content=f"Using `{name}` identity", ephemeral=True)
 
     def _format_lines(self, lines: list):
         """convert lines into pretty strings"""
@@ -172,6 +172,6 @@ class BaseCommands(commands.Cog):
             if skip_username:
                 output.append(f"{result_string} on {role_string} (<t:{datetime}:R>)")
             else:
-                output.append(f"`{username.replace('--', ' as ')}`: {result_string} on {role_string} (<t:{datetime}:R>)")
+                output.append(f"`{username.replace('--', '` as `', 1)}`: {result_string} on {role_string} (<t:{datetime}:R>)")
 
         return output

@@ -28,6 +28,13 @@ class DatabaseHandler:
         else:
             self._username_map[f"{server_id}--{username}"] = f"{username}--{profile}"
 
+    def get_identity(self, server_id: int, username: str):
+        profile_username = self._username_map.get(f"{server_id}--{username}", username)
+        if profile_username == username:
+            return None
+        else:
+            return "--".join(profile_username.split("--")[1:])
+
     async def _get_user_id(self, server_id: int, username: str):
         """Gets a user ID from a map name, inserting if not present"""
         profile_username = self._username_map.get(f"{server_id}--{username}", username)

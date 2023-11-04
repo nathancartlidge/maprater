@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import discord
 from discord import ApplicationContext
@@ -51,7 +52,8 @@ class UpdateCommands(discord.Cog):
             await ctx.respond(string, ephemeral=True)
 
     @staticmethod
-    def format_update(role: Roles, results: list[Results], current_sr: int, is_final: bool = False):
+    def format_update(role: Roles, results: list[Results], current_sr: int, profile_active: Optional[str] = None,
+                      is_final: bool = False):
         """Formats update strings nicely"""
         lines = []
 
@@ -60,24 +62,37 @@ class UpdateCommands(discord.Cog):
         loss_count = results.count(Results.LOSS)
         update_emoji = ICONS[win_count >= 5 or loss_count <= win_count]
 
-        if is_final:
-            lines.append(f"{ICONS[role]} **Rank Update!**")
+        if profile_active is not None:
+            if is_final:
+                lines.append(f"{ICONS[role]} **Rank Update (as `{profile_active}`)!")
+            else:
+                lines.append(f"{ICONS[role]} **Rank Update So Far (as `{profile_active}`):**")
         else:
-            lines.append(f"{ICONS[role]} **Rank Update So Far:**")
+            if is_final:
+                lines.append(f"{ICONS[role]} **Rank Update!**")
+            else:
+                lines.append(f"{ICONS[role]} **Rank Update So Far:**")
 
-        result_emojis = "".join([ICONS[result] for result in results])
-        lines.append(f"{update_emoji}: {result_emojis}")
+        if len(results) > 0:
+            result_emojis = "".join([ICONS[result] for result in results])
+            lines.append(f"{update_emoji}: {result_emojis}")
 
-        win_string = f"{win_count} {('win', 'wins')[win_count != 1]}"
-        draw_string = f", {draw_count} {('draw', 'draws')[draw_count != 1]}," if draw_count != 0 else ""
-        loss_string = f"{loss_count} {('loss', 'losses')[loss_count != 1]}"
+            win_string = f"{win_count} {('win', 'wins')[win_count != 1]}"
+            draw_string = f", {draw_count} {('draw', 'draws')[draw_count != 1]}," if draw_count != 0 else ""
+            loss_string = f"{loss_count} {('loss', 'losses')[loss_count != 1]}"
 
-        lines.append(f"{win_string}{draw_string} and {loss_string}")
+            lines.append(f"{win_string}{draw_string} and {loss_string}")
 
-        sr = 25 * (win_count - loss_count)
-        # todo: division estimation
+            sr = 25 * (win_count - loss_count)
+            # todo: division estimation
 
-        lines.append(f"Expected Outcome: `{sr:+}sr` (`{current_sr + sr}sr`)")
+            if current_sr == 0:
+                lines.append(f"Expected Outcome: `{sr:+}sr`")
+            else:
+                lines.append(f"Expected Outcome: `{sr:+}sr` (`{current_sr + sr}sr`)")
+        else:
+            lines.append(":warning: No games tracked so far this update")
+            sr = 0
 
         return "\n".join(lines), sr
 
@@ -86,10 +101,12 @@ class UpdateCommands(discord.Cog):
 
 async def check_update(interaction: Interaction, user: discord.User, role: Roles, db_handler: DatabaseHandler):
     """Checks whether a rank update is required"""
+    profile_active = db_handler.get_identity(interaction.guild_id, user.name)
     updated, results = await db_handler.do_rank_update(interaction.guild_id, user.name, role)
     current_sr = await db_handler.get_sr(interaction.guild_id, user.name, role)
-    string, sr = UpdateCommands.format_update(role, results, current_sr, is_final=updated)
+    string, sr = UpdateCommands.format_update(role, results, current_sr, profile_active, is_final=updated)
     if updated:
         string += ALIGNMENT_UPDATE
-        await db_handler.set_sr(interaction.guild_id, user.name, role, min(5000, current_sr + sr))
+        if current_sr != 0:
+            await db_handler.set_sr(interaction.guild_id, user.name, role, min(5000, current_sr + sr))
     await interaction.response.send_message(string, ephemeral=True)
