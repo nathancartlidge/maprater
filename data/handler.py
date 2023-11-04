@@ -164,12 +164,15 @@ class DatabaseHandler:
 
     async def _test_rank_update(self, server_id: int, username: str, role: str):
         """Tests if a rank update is expected"""
+        # todo: swap this out for user id
+        profile_username = self._username_map.get(f"{server_id}--{username}", username)
+
         needs_update = False
         await self._ensure_tables_exist(server_id)
         async with aiosqlite.connect(self.file(server_id)) as conn:
             cursor = await conn.cursor()
 
-            await cursor.execute(CHECK_RANK_UPDATE, (role, username))
+            await cursor.execute(CHECK_RANK_UPDATE, (role, profile_username))
             result = await cursor.fetchall()
             result_dict = dict(result)  # noqa
             loss_count = result_dict.get(Results.LOSS.name[0], 0) + result_dict.get(Results.DRAW.name[0], 0)

@@ -12,11 +12,12 @@ ALIGNMENT_UPDATE = "\n> have you **not** just had an update? run the command" \
                    + "`/rank_update [role]` after an update to fix the alignment"
 
 
-class UpdateCommand(discord.Cog):
+class UpdateCommands(discord.Cog):
     """Function to provide Rank Update Handling"""
 
-    def __init__(self, db_handler: DatabaseHandler) -> None:
+    def __init__(self, bot: discord.Bot, db_handler: DatabaseHandler) -> None:
         super().__init__()
+        self.bot = bot
         self.db_handler = db_handler
 
     @slash_command(description="Rank update information")
@@ -28,7 +29,7 @@ class UpdateCommand(discord.Cog):
                                         choices=[True, False], default=False)):
         """A manual rank update"""
         if reset:
-            logging.info("Forcing a rank update on %s for %s", role, ctx.user)
+            logging.info("Forcing a rank update on %s for %s", role, ctx.user.name)
 
         role_enum = {"Tank": Roles.TANK, "Damage": Roles.DAMAGE, "Support": Roles.SUPPORT}[role]
 
@@ -36,8 +37,7 @@ class UpdateCommand(discord.Cog):
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
-        _, string = await self.db_handler.do_rank_update(ctx.guild_id, str(ctx.user),
-                                                         role_enum, force=reset)
+        _, string = await self.db_handler.do_rank_update(ctx.guild_id, ctx.user.name, role_enum, force=reset)
         if string is None:
             if reset:
                 await ctx.respond(f"Rank Update tracking enabled for {role}!", ephemeral=True)
@@ -45,7 +45,7 @@ class UpdateCommand(discord.Cog):
                 await ctx.respond(f"No known rank update for {role} - have you started tracking?",
                                   ephemeral=True)
         else:
-            string, _ = UpdateCommand.format_update(role_enum, string, reset)
+            string, _ = UpdateCommands.format_update(role_enum, string, reset)
             if reset:
                 string += "\n> please rank all your games!"
             await ctx.respond(string, ephemeral=True)
@@ -88,7 +88,7 @@ async def check_update(interaction: Interaction, user: discord.User, role: Roles
     """Checks whether a rank update is required"""
     updated, results = await db_handler.do_rank_update(interaction.guild_id, user.name, role)
     current_sr = await db_handler.get_sr(interaction.guild_id, user.name, role)
-    string, sr = UpdateCommand.format_update(role, results, current_sr, is_final=updated)
+    string, sr = UpdateCommands.format_update(role, results, current_sr, is_final=updated)
     if updated:
         string += ALIGNMENT_UPDATE
         await db_handler.set_sr(interaction.guild_id, user.name, role, min(5000, current_sr + sr))
