@@ -15,8 +15,9 @@ from rank_update import check_update
 class ResultButtons(discord.ui.View):
     """Persistent input buttons"""
 
-    def __init__(self, db_handler):
+    def __init__(self, bot: discord.Bot, db_handler: DatabaseHandler):
         super().__init__(timeout=None)  # timeout of the view must be set to None
+        self.bot = bot
         self.db_handler = db_handler
 
     async def _callback(self, result: Results, role: Roles, interaction: Interaction):
@@ -27,11 +28,17 @@ class ResultButtons(discord.ui.View):
                                         datetime=time.time())
         await check_update(interaction, interaction.user, role, self.db_handler)
 
+    async def _get_update(self, role: Roles, interaction: Interaction):
+        assert interaction.guild_id is not None
+        # todo: check last submission - time limit
+        logging.info("query: %s on %s", interaction.user, role.name)
+        await check_update(interaction, interaction.user, role, self.db_handler)
+
     # Tank
     @discord.ui.button(emoji=ICONS[Roles.TANK], custom_id="Tx",
-                       style=ButtonStyle.grey, row=0, disabled=True)
+                       style=ButtonStyle.grey, row=0)
     async def _tank_icon(self, _, interaction):
-        return
+        await self._get_update(role=Roles.TANK, interaction=interaction)
 
     @discord.ui.button(label="Win", custom_id="TWin",
                        style=ButtonStyle.green, row=0)
@@ -50,9 +57,9 @@ class ResultButtons(discord.ui.View):
 
     # Damage
     @discord.ui.button(emoji=ICONS[Roles.DAMAGE], custom_id="Dx",
-                       style=ButtonStyle.grey, row=1, disabled=True)
+                       style=ButtonStyle.grey, row=1)
     async def _damage_icon(self, _, interaction):
-        return
+        await self._get_update(role=Roles.DAMAGE, interaction=interaction)
 
     @discord.ui.button(label="Win", custom_id="DWin",
                        style=ButtonStyle.green, row=1)
@@ -71,9 +78,9 @@ class ResultButtons(discord.ui.View):
 
     # Support
     @discord.ui.button(emoji=ICONS[Roles.SUPPORT], custom_id="Sx",
-                       style=ButtonStyle.grey, row=2, disabled=True)
+                       style=ButtonStyle.grey, row=2)
     async def _support_icon(self, _, interaction):
-        return
+        await self._get_update(role=Roles.SUPPORT, interaction=interaction)
 
     @discord.ui.button(label="Win", custom_id="SWin",
                        style=ButtonStyle.green, row=2)

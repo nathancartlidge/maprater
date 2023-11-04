@@ -16,7 +16,8 @@ from data.handler import DatabaseHandler
 class BaseCommands(commands.Cog):
     """Basic commands used for bot"""
 
-    def __init__(self, db_handler: DatabaseHandler):
+    def __init__(self, bot: discord.Bot, db_handler: DatabaseHandler):
+        self.bot = bot
         self.db_handler = db_handler
 
     @slash_command(description="Create rating buttons")
@@ -32,7 +33,7 @@ class BaseCommands(commands.Cog):
         logging.info("Created buttons - Invoked by %s", ctx.author.name)
         await ctx.respond(
             content="*over-sr-watch*",
-            view=ResultButtons(self.db_handler)
+            view=ResultButtons(self.bot, self.db_handler)
         )
 
     @slash_command(description="Get raw data")

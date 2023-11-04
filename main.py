@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 from bot import MapRater
 from commands import BaseCommands
-from rank_update import UpdateCommand
+from rank_update import UpdateCommands
 from data.handler import DatabaseHandler
 
 if __name__ == "__main__":
@@ -51,7 +51,7 @@ if __name__ == "__main__":
             """Show bot latency [debug]"""
             await ctx.respond(f"pong! [{round(bot.latency, 2)}s]", ephemeral=True)
 
-    bot.add_cog(BaseCommands(bot.db_handler))
-    bot.add_cog(UpdateCommand(bot.db_handler))
+    bot.add_cog(BaseCommands(bot, bot.db_handler))
+    bot.add_cog(UpdateCommands(bot, bot.db_handler))
 
     bot.run(TOKEN)

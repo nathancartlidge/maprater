@@ -16,7 +16,7 @@ class MapRater(discord.Bot):
             activity=discord.Game(name="Overwatch 1's SR")
         )
         # enable persistence for the map buttons
-        self.add_view(ResultButtons(self.db_handler))
+        self.add_view(ResultButtons(self, self.db_handler))
 
     async def on_connect(self):
         logging.info("Syncing commands")
