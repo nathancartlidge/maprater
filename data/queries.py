@@ -50,7 +50,8 @@ def SELECT_LAST_N_USERNAME(n: int):
         SELECT ow2.rating_id, users.username, ow2.result, ow2.role, ow2.datetime
             FROM ow2
                 INNER JOIN users ON ow2.author_id = users.user_id
-            WHERE users.username = ?
+            WHERE users.username = @username
+                OR users.username LIKE @username || '--%'
             ORDER BY rating_id DESC
             LIMIT {min(100, max(1, int(n))):0d}
     """
@@ -62,7 +63,7 @@ def SELECT_LAST_N_ROLE(n: int):
         SELECT ow2.rating_id, users.username, ow2.result, ow2.role, ow2.datetime
             FROM ow2
                 INNER JOIN users ON ow2.author_id = users.user_id
-            WHERE ow2.role = ?
+            WHERE ow2.role = @role
             ORDER BY rating_id DESC
             LIMIT {min(100, max(1, int(n))):0d}
     """
@@ -74,8 +75,9 @@ def SELECT_LAST_N_USERNAME_ROLE(n: int):
         SELECT users.username, ow2.result, ow2.role, ow2.datetime
             FROM ow2
                 INNER JOIN users ON ow2.author_id = users.user_id
-            WHERE users.username = ?
-                AND ow2.role = ?
+            WHERE users.username = @username
+                OR users.username LIKE @username || '--%'
+                AND ow2.role = @role
             ORDER BY rating_id DESC
             LIMIT {min(100, max(1, int(n))):0d}
     """

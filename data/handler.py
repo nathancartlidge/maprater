@@ -3,9 +3,7 @@
 import logging
 from typing import Optional
 
-import sqlite3
 import aiosqlite
-import pandas as pd
 
 from definitions import Results, Roles
 from data.queries import *
@@ -113,14 +111,14 @@ class DatabaseHandler:
             if username is not None:
                 if role_char is not None:
                     query = SELECT_LAST_N_USERNAME_ROLE(count)
-                    await cursor.execute(query, (username, role_char))
+                    await cursor.execute(query, {"username": username, "role": role_char})
                 else:
                     query = SELECT_LAST_N_USERNAME(count)
-                    await cursor.execute(query, (username,))
+                    await cursor.execute(query, {"username": username})
 
             elif role_char is not None:
                 query = SELECT_LAST_N_ROLE(count)
-                await cursor.execute(query, (role_char,))
+                await cursor.execute(query, {"role": role_char})
 
             else:
                 query = SELECT_LAST_N(count)

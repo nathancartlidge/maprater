@@ -7,7 +7,6 @@ import discord
 from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
-import pandas as pd
 
 from definitions import ICONS, Roles
 from embed_handler import ResultButtons, UndoLast
@@ -30,7 +29,7 @@ class BaseCommands(commands.Cog):
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
-        logging.info("Created buttons - Invoked by %s", ctx.author)
+        logging.info("Created buttons - Invoked by %s", ctx.author.name)
         await ctx.respond(
             content="*over-sr-watch*",
             view=ResultButtons(self.db_handler)
@@ -39,7 +38,7 @@ class BaseCommands(commands.Cog):
     @slash_command(description="Get raw data")
     async def data(self, ctx: ApplicationContext):
         """Extracts raw data from the bot"""
-        logging.info("Getting Raw Data - Invoked by %s", ctx.author)
+        logging.info("Getting Raw Data - Invoked by %s", ctx.author.name)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
@@ -75,9 +74,11 @@ class BaseCommands(commands.Cog):
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
-        username = str(user) if user is not None else None
+        username = user.name if user is not None else None
 
-        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username, role)
+        role_enum = {"Tank": Roles.TANK, "Damage": Roles.DAMAGE, "Support": Roles.SUPPORT}[role]
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username, role_enum)
+
         if len(lines) == 0:
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
         else:
@@ -87,7 +88,7 @@ class BaseCommands(commands.Cog):
                     and len(lines) <= 4:
                 can_delete = True
 
-            lines = self._format_lines(lines, skip_username=username is not None)
+            lines = self._format_lines(lines)
             length = len("\n".join(lines))
 
             if length >= 2000:
@@ -154,9 +155,10 @@ class BaseCommands(commands.Cog):
         else:
             await ctx.respond(content=f"Using '{name}' identity", ephemeral=True)
 
-    def _format_lines(self, lines: list, skip_username: bool = False):
+    def _format_lines(self, lines: list):
         """convert lines into pretty strings"""
         output = []
+        skip_username = len(lines) == 0 or all(line[0] == lines[0][0] for line in lines)
         if skip_username:
             output.append(f"Data for user `{lines[0][0]}`:")
         for (username, result, role, datetime) in lines:
