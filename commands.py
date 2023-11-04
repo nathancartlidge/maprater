@@ -143,6 +143,18 @@ class BaseCommands(commands.Cog):
         await self.db_handler.set_sr(ctx.guild_id, ctx.user.name, role, value)
         await ctx.respond(content=f"Set {ICONS[role]} SR to `{value}`", ephemeral=True)
 
+    @slash_command(description="Sets your current profile")
+    async def set_profile(
+            self, ctx: ApplicationContext,
+            name: Option(str, description="Profile Name", required=False, default=None)
+    ):
+        self.db_handler.set_identity(ctx.guild_id, ctx.user.name, name)
+        if name is None:
+            await ctx.respond(content=f"Using default identity", ephemeral=True)
+        else:
+            await ctx.respond(content=f"Using '{name}' identity", ephemeral=True)
+
+
     def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""
         output = []

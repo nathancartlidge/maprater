@@ -16,22 +16,34 @@ class DatabaseHandler:
     def __init__(self, root_dir: str = "") -> None:
         self.root_dir = root_dir
         self.tables = set()
+        self._username_map = {}
 
     def file(self, server_id: int):
-        return f"{self.root_dir}{server_id}.db"
+        return f"{self.root_dir}{server_id}-sr.db"
+
+    def set_identity(self, server_id: int, username: str, profile: Optional[str]):
+        if profile is None:
+            try:
+                self._username_map.pop(f"{server_id}--{username}")
+            except KeyError:
+                pass
+        else:
+            self._username_map[f"{server_id}--{username}"] = f"{username}--{profile}"
 
     async def _get_user_id(self, server_id: int, username: str):
         """Gets a user ID from a map name, inserting if not present"""
+        profile_username = self._username_map.get(f"{server_id}--{username}", username)
+
         await self._ensure_tables_exist(server_id)
         async with aiosqlite.connect(self.file(server_id)) as conn:
             cursor = await conn.cursor()
 
-            await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
+            await cursor.execute(SELECT_USERID_FROM_USERNAME, (profile_username, ))
             user_id = await cursor.fetchone()
 
             if user_id is None:
-                await cursor.execute(INSERT_INTO_USERS, (username, ))
-                await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
+                await cursor.execute(INSERT_INTO_USERS, (profile_username, ))
+                await cursor.execute(SELECT_USERID_FROM_USERNAME, (profile_username, ))
                 user_id = await cursor.fetchone()
                 for role in Roles:
                     await cursor.execute(
