@@ -73,8 +73,16 @@ class DatabaseHandler:
             await cursor.execute(CREATE_DATA_TABLE)
             await cursor.execute(CREATE_UPDATE_TABLE)
 
-            await cursor.close()
             await conn.commit()
+
+            await cursor.execute("PRAGMA table_info(ow2);")
+            columns = [info[1] for info in await cursor.fetchall()]
+
+            if "sr" not in columns:
+                await cursor.execute("ALTER TABLE ow2 ADD COLUMN sr INTEGER;")
+
+            await conn.commit()
+            await cursor.close()
 
         self.tables.add(server_id)
 
