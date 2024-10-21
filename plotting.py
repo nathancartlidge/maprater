@@ -68,7 +68,7 @@ class PlotCommands(commands.Cog):
         super().__init__()
         self.db_handler = db_handler
 
-    @slash_command(description="Plot the current data")
+    # @slash_command(description="Plot the current data")
     async def plot(self, ctx: ApplicationContext,
                    mode: Option(str, description="What plotting mode should be used?",
                                 required=True,
@@ -126,7 +126,7 @@ class PlotCommands(commands.Cog):
         """Converts raw Dataframe to Pandas group-by format"""
 
         data["winloss"] = data["winloss"].replace(
-            to_replace=["w", "x", "l"],
+            to_replace=["win", "draw", "loss"],
             value=["Win", "Loss" if draw_is_loss else "Win", "Loss"]
         )
         data["role"] = data["role"].replace(to_replace=["t", "d", "s"],

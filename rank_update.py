@@ -16,7 +16,7 @@ class UpdateCommand(discord.Cog):
         super().__init__()
         self.db_handler = db_handler
 
-    @slash_command(description="Rank update information")
+    # @slash_command(description="Rank update information")
     async def rank_update(self, ctx: ApplicationContext,
                           role: Option(str, description="The role to update",
                                        choices=["Tank", "Damage", "Support"],
