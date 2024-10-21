@@ -9,7 +9,7 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 import pandas as pd
 
-from embed_handler import QUAL, MapButtons, UndoLast
+from embed_handler import BUTTON_MAPS, MapType, MapButtons, UndoLast
 from db_handler import DatabaseHandler
 
 
@@ -29,10 +29,8 @@ class BaseCommands(commands.Cog):
             return
 
         logging.info("Created buttons - Invoked by %s", ctx.author)
-        await ctx.respond(
-            content="Select a map to vote on:",
-            view=MapButtons(self.db_handler)
-        )
+        for map_types, cls in BUTTON_MAPS.items():
+            await ctx.respond(content=f"## {map_types}", view=cls(self.db_handler))
 
     @slash_command(description="Get raw data")
     async def data(self, ctx: ApplicationContext,
@@ -121,28 +119,25 @@ class BaseCommands(commands.Cog):
     async def last(
         self, ctx: ApplicationContext,
         count: Option(int, description="Number of entries to return",
-                      min_value=1, max_value=100, required=True),
+                      min_value=1, default=2, max_value=100, required=False),
         user: Option(discord.Member, description="Limit to a particular person",
-                     required=False, default=None),
-        role: Option(str, description="Limit to a particular role",
-                     required=False, default=None, choices=["Tank", "Damage", "Support"])):
+                     required=False, default=None)):
         """Prints the last `n` pieces of data to discord, with option to delete"""
-        logging.info("Getting last %s rows - Invoked by %s",
-                      count, ctx.author)
+        logging.info("Getting last %s rows - Invoked by %s", count, ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
-        username = str(user) if user is not None else None
+        username = str(user.name) if user is not None else None
 
-        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username, role)
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username)
         if len(lines) == 0:
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
         else:
             can_delete = False
             if isinstance(ctx.user, discord.Member) \
                 and ctx.user.guild_permissions.manage_messages \
-                    and len(lines) <= 4:
+                    and len(lines) <= 10:
                 can_delete = True
 
             lines = self._format_lines(lines, skip_username=username is not None)
@@ -183,24 +178,17 @@ class BaseCommands(commands.Cog):
                     ephemeral=True
                 )
 
-
     def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""
         output = []
         if skip_username:
             output.append(f"Data for user `{lines[0][0]}`:")
-        for (username, map_name, result, role, sentiment, datetime) in lines:
-            result_string = {"w": "🏆", "l": "❌", "x": "🤝"}[result]
-            role_string = {"t": "<:Tank:1031299011493249155>",
-                           "d": "<:Damage:1031299007793864734>",
-                           "s": "<:Support:1031299004836880384>"}[role]
-            sent_string = QUAL[sentiment]
+        for (username, map_name, result, datetime) in lines:
+            result_string = {"win": "🏆", "loss": "❌", "draw": "🤝"}[result]
 
             if skip_username:
-                output.append(f"{result_string} on {role_string} on *{map_name}*"
-                            + f" - *'{sent_string}'* (<t:{datetime}:R>)")
+                output.append(f"{result_string} on *{map_name}* (<t:{datetime}:R>)")
             else:
-                output.append(f"`{username}`: {result_string} on {role_string} on *{map_name}*"
-                            + f" - *'{sent_string}'* (<t:{datetime}:R>)")
+                output.append(f"`{username}`: {result_string} on *{map_name}* (<t:{datetime}:R>)")
 
         return output

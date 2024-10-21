@@ -15,9 +15,12 @@ class DatabaseHandler:
         self.root_dir = root_dir
         self.tables = set()
 
+    def get_db_name(self, server_id: int):
+        return f"{self.root_dir}{server_id}-v2.db"
+
     async def _get_user_id(self, server_id: int, username: str):
         """Gets a user ID from a map name, inserting if not present"""
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
             await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
@@ -33,7 +36,7 @@ class DatabaseHandler:
 
     async def _get_map_id(self, server_id: int, mapname: str):
         """Gets a map ID from a map name, inserting if not present"""
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
             await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname, ))
@@ -54,13 +57,12 @@ class DatabaseHandler:
         if server_id in self.tables:
             return True
 
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
             await cursor.execute(CREATE_USER_TABLE)
             await cursor.execute(CREATE_MAPS_TABLE)
             await cursor.execute(CREATE_DATA_TABLE)
-            await cursor.execute(CREATE_UPDATE_TABLE)
 
             await cursor.close()
             await conn.commit()
@@ -68,26 +70,22 @@ class DatabaseHandler:
         self.tables.add(server_id)
 
     async def write_line(self, server_id: int, username: str, mapname: str,
-                         result: str, role: str, sentiment: int,
-                         datetime: float):
+                         result: str, datetime: float):
         """writes a map review to the database"""
         await self._ensure_tables_exist(server_id)
         map_id = await self._get_map_id(server_id, mapname)
         user_id = await self._get_user_id(server_id, username)
 
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
-            await cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result[0],
-                                                    role[0], int(sentiment),
-                                                    int(datetime)))
+            await cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result, int(datetime)))
 
             await cursor.close()
             await conn.commit()
 
     async def get_last(self, server_id: int, count: int = 1,
-                       username: Optional[str] = None,
-                       role: Optional[str] = None) -> tuple[list, list]:
+                       username: Optional[str] = None) -> tuple[list, list]:
         """
         gets the last line of data from the file, if present
         """
@@ -97,25 +95,15 @@ class DatabaseHandler:
         if count not in list(range(101)):
             return [], []
 
-        role_char = {None: None, "Tank": "t", "Damage": "d", "Support": "s"}[role]
-
         await self._ensure_tables_exist(server_id)
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
             # WARN: This does risk SQL injection! However, given the value is a
             #       bounded int, this should not pose much concern
             if username is not None:
-                if role_char is not None:
-                    query = SELECT_LAST_N_USERNAME_ROLE(count)
-                    await cursor.execute(query, (username, role_char))
-                else:
-                    query = SELECT_LAST_N_USERNAME(count)
-                    await cursor.execute(query, (username,))
-
-            elif role_char is not None:
-                query = SELECT_LAST_N_ROLE(count)
-                await cursor.execute(query, (role_char,))
+                query = SELECT_LAST_N_USERNAME(count)
+                await cursor.execute(query, (username,))
 
             else:
                 query = SELECT_LAST_N(count)
@@ -138,7 +126,7 @@ class DatabaseHandler:
             return
 
         await self._ensure_tables_exist(server_id)
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
             await cursor.execute(DELETE_N_IDS(len(ids)), ids)
@@ -148,7 +136,7 @@ class DatabaseHandler:
     async def get_line_count(self, server_id: int):
         """gets the number of (data) lines in the file"""
         await self._ensure_tables_exist(server_id)
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
+        async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
             await cursor.execute("select count(rating_id) from ow2")
@@ -159,60 +147,6 @@ class DatabaseHandler:
 
         return count
 
-    async def _test_rank_update(self, server_id: int, username: str, role: str):
-        """Tests if a rank update is expected"""
-        needs_update = False
-        await self._ensure_tables_exist(server_id)
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
-            cursor = await conn.cursor()
-
-            await cursor.execute(CHECK_RANK_UPDATE, (role, username))
-            result = await cursor.fetchall()
-            result_dict = dict(result)
-            loss_count = result_dict.get("l", 0)
-            win_count = result_dict.get("w", 0)
-            if loss_count >= 15:
-                needs_update = True
-            elif win_count >= 5:
-                needs_update = True
-
-            logging.info("%s / %s", loss_count, win_count)
-
-            await cursor.close()
-
-        return needs_update
-
-    async def do_rank_update(self, server_id: int, username: str, role: str,
-                             force: bool = False):
-        """Checks if a rank update is expected, performing one if needed"""
-        needs_update = await self._test_rank_update(server_id, username, role)
-        user_id = await self._get_user_id(server_id, username)
-        last_id, _ = await self.get_last(server_id, 1, username)
-        if len(last_id) == 1:
-            last_id = last_id[0]
-        else:
-            last_id = -1
-
-        logging.info("last id is %s", last_id)
-
-        result_str = None
-        async with aiosqlite.connect(f"{self.root_dir}{server_id}.db") as conn:
-            cursor = await conn.cursor()
-            await cursor.execute(GET_GAMES_SINCE_UPDATE, (role, user_id))
-            result = "".join(map(lambda x: x[0], await cursor.fetchall()))
-            if result != "":
-                result_str = result
-
-            if needs_update or force:
-                await cursor.execute(INSERT_RANK_UPDATES, (user_id, role, last_id, last_id))
-
-            await cursor.close()
-
-            if needs_update or force:
-                await conn.commit()
-
-        return needs_update or force, result_str
-
     def get_pandas_data(self, server_id: int):
         """
         reads the csv file into a Pandas df
@@ -221,7 +155,7 @@ class DatabaseHandler:
 
         logging.info("Getting data as Pandas")
 
-        with sqlite3.connect(f"{self.root_dir}{server_id}.db") as conn:
+        with sqlite3.connect(self.get_db_name(server_id)) as conn:
             data = pd.read_sql_query(SELECT_ALL_PANDAS, conn)
 
         data["time"] = pd.to_datetime(data["time"])
