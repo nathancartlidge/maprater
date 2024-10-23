@@ -10,6 +10,8 @@ from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
+from plotting import PlotCommands
+
 
 class MapType(Enum):
     CONTROL = 0
@@ -111,7 +113,20 @@ class VotingButtons(discord.ui.View):
         logging.info("%s voted: %s on %s", interaction.user.name, result, self.map)
 
         await self.db_handler.write_line(server_id=interaction.guild_id, username=interaction.user.name, mapname=self.map, result=result, datetime=time.time())
-        await interaction.response.edit_message(content=f"{result.title()} on {self.map}", view=None)
+        # todo: get information about this map and your current streak and display it inline here!
+
+        await interaction.response.defer(thinking=True, ephemeral=True)
+
+        data = self.db_handler.get_pandas_data(interaction.guild_id)
+        data = data[data.author == interaction.user.name]
+        if data.shape[0]:
+            pc = PlotCommands(self.db_handler)
+            buffer = pc.get_winrate_figure(data, window_size=20)
+            await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**", view=None,
+                                                    files=[discord.File(fp=buffer, filename="winrate.png")])
+        else:
+            await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**", view=None)
+
 
 class UndoLast(discord.ui.View):
     """View for the 'undo' button triggered after /last"""
@@ -130,7 +145,7 @@ class UndoLast(discord.ui.View):
         assert interaction.guild_id is not None
 
         await self.db_handler.delete_ids(interaction.guild_id, self.ids)
-        await self.message.edit(
+        await interaction.response.edit_message(
             content="\n".join(self.lines) + "\n\n*successfully deleted*",
             view=None
         )

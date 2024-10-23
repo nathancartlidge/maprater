@@ -49,7 +49,7 @@ class BaseCommands(commands.Cog):
             return
 
         if data_format == "sqlite" or data_format is None:
-            path = f"{self.db_handler.root_dir}{ctx.guild_id}.db"
+            path = self.db_handler.get_db_name(ctx.guild_id)
             file = discord.File(fp=path, filename="data.db")
         else:
             pd_data = self.db_handler.get_pandas_data(ctx.guild_id)
