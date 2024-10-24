@@ -6,6 +6,8 @@ import logging
 import discord
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
 
 from discord import ApplicationContext
 from discord.ext import commands
@@ -56,6 +58,10 @@ MAP_TYPES = {
     "Colosseo": "Push"
 }
 
+OW2_MAPS = ["Queen St", "Circuit", "Colosseo", "Midtown", "Paraiso",
+            "Esperanca", "Shambali", "Antarctic", "Junk City", "Suravasa",
+            "Samoa", "Runasapi", "Hanaoka", "Anubis"]
+
 mpl.use("agg")  # force non-interactive backend
 
 class PlotCommands(commands.Cog):
@@ -84,13 +90,13 @@ class PlotCommands(commands.Cog):
 
         logging.info("sending image")
         await ctx.respond(
-            content=f"Rolling winrate for {user.name} (n={window_size})",
+            content=f"Rolling winrate for `{user.name}` (n={window_size})",
             files=[discord.File(fp=buffer, filename="winrate.png")],
             ephemeral=True
         )
 
     def get_winrate_figure(self, data, window_size):
-        # get winrate data
+        """rolling winrate history"""
         logging.info("calculating winrate")
         winloss_score = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
         winrate = 100 * winloss_score.rolling(window=window_size, min_periods=3, center=True).mean().dropna().to_numpy()
@@ -116,11 +122,60 @@ class PlotCommands(commands.Cog):
         ax.spines[["bottom", "top", "right"]].set_visible(False)
         ax.set_ylim(0, 100)
         ax.set_xlim(0, len(winrate) - 1)
-        fig.suptitle(f"Rolling Winrate")
 
         logging.info("making image")
         buffer = self._export_figure(fig)
 
+        return buffer
+
+    @slash_command(description="Per-Map Winrate")
+    async def map_winrate(self, ctx: ApplicationContext,
+                      user: Option(discord.Member, description="Limit data to a particular person", default=None)):
+        # get data for this user
+        logging.info("fetching data")
+        data = self.db_handler.get_pandas_data(ctx.guild_id)
+        if user is not None:
+            data = data[data.author == user.name]
+
+        if data.shape[0] == 0:
+            await ctx.respond(
+                content=":warning: No matching data found - Cannot create graphs",
+                ephemeral=True
+            )
+
+        # make the plot
+        buffer = self.get_map_winrate_figure(data)
+
+        logging.info("sending image")
+        await ctx.respond(
+            content=f"Per-Map Winrate for `{user.name}`" if user is not None else "Per-Map Winrate",
+            files=[discord.File(fp=buffer, filename="map_winrate.png")],
+            ephemeral=True
+        )
+
+    def get_map_winrate_figure(self, data):
+        """per-map winrate plot"""
+        logging.info("calculating winrate")
+        data["winloss-score"] = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
+
+        grouped = data.groupby("map")["winloss-score"]
+        maps = grouped.mean()[grouped.count() >= 2].sort_values()
+        game = np.array(["OW2" if i in OW2_MAPS else "OW1" for i in maps.index])
+
+        logging.info("making plot")
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=(10, 4))
+
+        sns.barplot(x=maps.index, y=100 * maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"}, dodge=False,
+                    ax=ax)
+
+        ax.set_xlabel("Map")
+        ax.set_ylabel("Winrate (%)")
+        ax.tick_params(axis='x', rotation=45)
+        ax.set_ylim(0, 100)
+
+        logging.info("making image")
+        buffer = self._export_figure(fig)
         return buffer
 
     # todo: write plotting functions for winstreak, global winrate, map winrate
