@@ -7,6 +7,7 @@ import discord
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import seaborn as sns
 
 from discord import ApplicationContext
@@ -14,53 +15,7 @@ from discord.ext import commands
 from discord.commands import Option, slash_command
 
 from db_handler import DatabaseHandler
-
-PLOT_DESCRIPTION = {
-    "normalise": "Data has been normalised by winrate (equal weight to ratings" \
-        + " given from losses as ratings given from wins)",
-    "winloss": "Data has been separated by map and win/loss",
-    "maptype": "Data has been separated by map type and win/loss",
-    "maptype_role": "Data has been separated by map type and role",
-    "role": "Data has been separated by map type and role, not normalised",
-    "average": "Data has been separated by map, but has not been normalised",
-    "count": "Data shows the number of ratings per map, separated by win/loss",
-    "distribution": "Data shows KDE-smoothed plot of ranking distribution, separated by win/loss",
-    "distribution_all": "Data shows KDE-smoothed plot of ranking distribution, separated by voter"
-}
-WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
-ROLE_PALETTE = {"Tank": "tab:orange", "Damage": "tab:blue", "Support": "tab:green"}
-MAP_TYPES = {
-    "Circuit": "Payload",
-    "Dorado": "Payload",
-    "Havana": "Payload",
-    "Junkertown": "Payload",
-    "Rialto": "Payload",
-    "R66": "Payload",
-    "WPG": "Payload",
-    "Shambali": "Payload",
-
-    "Blizzard": "Hybrid",
-    "Eichenwalde": "Hybrid",
-    "Hollywood": "Hybrid",
-    "Kings": "Hybrid",
-    "Midtown": "Hybrid",
-    "Paraiso": "Hybrid",
-
-    "Busan": "Control",
-    "Ilios": "Control",
-    "Lijiang": "Control",
-    "Nepal": "Control",
-    "Oasis": "Control",
-    "Antarctic": "Control",
-
-    "QueenStreet": "Push",
-    "Esperanca": "Push",
-    "Colosseo": "Push"
-}
-
-OW2_MAPS = ["Queen St", "Circuit", "Colosseo", "Midtown", "Paraiso",
-            "Esperanca", "Shambali", "Antarctic", "Junk City", "Suravasa",
-            "Samoa", "Runasapi", "Hanaoka", "Anubis"]
+from constants import MAPS, OW2_MAPS
 
 mpl.use("agg")  # force non-interactive backend
 
@@ -129,8 +84,9 @@ class PlotCommands(commands.Cog):
         return buffer
 
     @slash_command(description="Per-Map Winrate")
-    async def map_winrate(self, ctx: ApplicationContext,
-                      user: Option(discord.Member, description="Limit data to a particular person", default=None)):
+    async def map_winrate(self,
+                          ctx: ApplicationContext,
+                          user: Option(discord.Member, description="Limit data to a particular person", default=None)):
         # get data for this user
         logging.info("fetching data")
         data = self.db_handler.get_pandas_data(ctx.guild_id)
@@ -185,7 +141,8 @@ class PlotCommands(commands.Cog):
 
         grouped = data.groupby("map")["winloss-score"]
         if count_only:
-            maps = grouped.count().sort_values()
+            all_maps = pd.Series(index=[map_name for map_set in MAPS.values() for map_name in map_set], data=0)
+            maps = (grouped.count() + all_maps).fillna(0).sort_values()
         else:
             count = grouped.count()
             sum = grouped.sum()

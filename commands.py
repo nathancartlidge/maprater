@@ -68,7 +68,7 @@ class BaseCommands(commands.Cog):
     async def last(
         self, ctx: ApplicationContext,
         count: Option(int, description="Number of entries to return",
-                      min_value=1, default=2, max_value=100, required=False),
+                      min_value=1, default=1, max_value=100, required=True),
         user: Option(discord.Member, description="Limit to a particular person",
                      required=False, default=None)):
         """Prints the last `n` pieces of data to discord, with option to delete"""

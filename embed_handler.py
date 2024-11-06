@@ -10,27 +10,7 @@ from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
-from plotting import PlotCommands
-
-
-class MapType(Enum):
-    CONTROL = 0
-    ESCORT = 1
-    FLASHPOINT = 2
-    HYBRID = 3
-    PUSH = 4
-    CLASH = 5
-
-MAPS = {
-    MapType.CONTROL: ["Antarctic", "Busan", "Ilios", "Lijiang", "Nepal", "Oasis", "Samoa"],
-    MapType.ESCORT: ["Circuit", "Dorado", "Havana", "Junkertown", "Rialto", "Route 66", "Shambali", "Gibraltar"],
-    MapType.FLASHPOINT: ["Junk City", "Suravasa"],
-    MapType.HYBRID: ["Blizzard", "Eichenwalde", "Hollywood", "King's", "Midtown", "Numbani", "Paraiso"],
-    MapType.PUSH: ["Colosseo", "Esperanca", "Queen St", "Runasapi"],
-    MapType.CLASH: ["Hanaoka", "Anubis"]
-}
-
-TTL = 60
+from constants import MAPS, MapType
 
 class MapButtons(discord.ui.View):
     """Persistent map rating buttons"""
