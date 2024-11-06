@@ -148,31 +148,70 @@ class PlotCommands(commands.Cog):
 
         logging.info("sending image")
         await ctx.respond(
-            content=f"Per-Map Winrate for `{user.name}`" if user is not None else "Per-Map Winrate",
+            content=f"Normalised Per-Map Winrate for `{user.name}`" if user is not None else "Normalised Per-Map Winrate",
             files=[discord.File(fp=buffer, filename="map_winrate.png")],
             ephemeral=True
         )
 
-    def get_map_winrate_figure(self, data):
+    @slash_command(description="Per-Map Play Count")
+    async def map_play_count(self, ctx: ApplicationContext,
+                             user: Option(discord.Member, description="Limit data to a particular person", default=None)):
+        # get data for this user
+        logging.info("fetching data")
+        data = self.db_handler.get_pandas_data(ctx.guild_id)
+        if user is not None:
+            data = data[data.author == user.name]
+
+        if data.shape[0] == 0:
+            await ctx.respond(
+                content=":warning: No matching data found - Cannot create graphs",
+                ephemeral=True
+            )
+
+        # make the plot
+        buffer = self.get_map_winrate_figure(data, count_only=True)
+
+        logging.info("sending image")
+        await ctx.respond(
+            content=f"Per-Map Play Count for `{user.name}`" if user is not None else "Per-Map Play Count",
+            files=[discord.File(fp=buffer, filename="map_count.png")],
+            ephemeral=True
+        )
+
+    def get_map_winrate_figure(self, data, count_only: bool = False):
         """per-map winrate plot"""
         logging.info("calculating winrate")
         data["winloss-score"] = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
 
         grouped = data.groupby("map")["winloss-score"]
-        maps = grouped.mean()[grouped.count() >= 2].sort_values()
+        if count_only:
+            maps = grouped.count().sort_values()
+        else:
+            count = grouped.count()
+            sum = grouped.sum()
+
+            # normalisation factor: add one win and one loss to every map
+            maps = ((sum + 1) / (count + 2)).sort_values()
+
         game = np.array(["OW2" if i in OW2_MAPS else "OW1" for i in maps.index])
 
         logging.info("making plot")
         plt.style.use('dark_background')
         fig, ax = plt.subplots(figsize=(10, 4))
 
-        sns.barplot(x=maps.index, y=100 * maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"}, dodge=False,
-                    ax=ax)
+        if count_only:
+            sns.barplot(x=maps.index, y=maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"},
+                        dodge=False, ax=ax)
+            ax.set_ylabel("Play Count")
+        else:
+            ax.axhline(50, color="white", linewidth=1, zorder=-1)
+            sns.barplot(x=maps.index, y=100 * maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"},
+                        dodge=False, ax=ax)
+            ax.set_ylim(0, 100)
+            ax.set_ylabel("Winrate (%)")
 
         ax.set_xlabel("Map")
-        ax.set_ylabel("Winrate (%)")
         ax.tick_params(axis='x', rotation=45)
-        ax.set_ylim(0, 100)
 
         logging.info("making image")
         buffer = self._export_figure(fig)
