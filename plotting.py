@@ -111,7 +111,8 @@ class PlotCommands(commands.Cog):
 
     @slash_command(description="Per-Map Play Count")
     async def map_play_count(self, ctx: ApplicationContext,
-                             user: Option(discord.Member, description="Limit data to a particular person", default=None)):
+                             user: Option(discord.Member, description="Limit data to a particular person", default=None),
+                             win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False)):
         # get data for this user
         logging.info("fetching data")
         data = self.db_handler.get_pandas_data(ctx.guild_id)
@@ -125,25 +126,31 @@ class PlotCommands(commands.Cog):
             )
 
         # make the plot
-        buffer = self.get_map_winrate_figure(data, count_only=True)
+        buffer = self.get_map_winrate_figure(data, count_only=True, win_loss=win_loss)
 
         logging.info("sending image")
         await ctx.respond(
-            content=f"Per-Map Play Count for `{user.name}`" if user is not None else "Per-Map Play Count",
+            content="Per-Map " + "Net Wins" if win_loss else "Play Count" + f"for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
             ephemeral=True
         )
 
-    def get_map_winrate_figure(self, data, count_only: bool = False):
+    def get_map_winrate_figure(self, data, count_only: bool = False, win_loss: bool = False):
         """per-map winrate plot"""
         logging.info("calculating winrate")
         data["winloss-score"] = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
+        data["winloss-net"] = data["winloss"].replace({"win": 1.0, "draw": 0.0, "loss": -1.0})
 
-        grouped = data.groupby("map")["winloss-score"]
         if count_only:
             all_maps = pd.Series(index=[map_name for map_set in MAPS.values() for map_name in map_set], data=0)
-            maps = (grouped.count() + all_maps).fillna(0).sort_values()
+            if win_loss:
+                grouped = data.groupby("map")["winloss-net"]
+                maps = (grouped.sum() + all_maps).fillna(0).sort_values()
+            else:
+                grouped = data.groupby("map")["winloss-score"]
+                maps = (grouped.count() + all_maps).fillna(0).sort_values()
         else:
+            grouped = data.groupby("map")["winloss-score"]
             count = grouped.count()
             sum = grouped.sum()
 
@@ -159,7 +166,11 @@ class PlotCommands(commands.Cog):
         if count_only:
             sns.barplot(x=maps.index, y=maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"},
                         dodge=False, ax=ax)
-            ax.set_ylabel("Play Count")
+            if win_loss:
+                ax.axhline(0, color="white", linewidth=1, zorder=2)
+                ax.set_ylabel("Net Wins")
+            else:
+                ax.set_ylabel("Play Count")
         else:
             ax.axhline(50, color="white", linewidth=1, zorder=-1)
             sns.barplot(x=maps.index, y=100 * maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"},
