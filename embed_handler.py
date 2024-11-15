@@ -16,7 +16,7 @@ class MapButtons(discord.ui.View):
     """Persistent map rating buttons"""
     MAP_TYPES = None
 
-    def __init__(self, db_handler):
+    def __init__(self, db_handler: DatabaseHandler):
         self.db_handler = db_handler
         super().__init__(timeout=None) # timeout of the view must be set to None
 
@@ -27,7 +27,10 @@ class MapButtons(discord.ui.View):
 
     async def _callback(self, map_name, interaction: Interaction):
         logging.info("map callback - %s by %s", map_name, interaction.user)
-        text = f"Result for **{map_name}**"
+        _, past_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=20,
+                                                         username=interaction.user.name, map_name=map_name)
+        past_results_emoji = [{"win": "🏆", "loss": "❌", "draw": "🤝"}[result] for _, _, result, _ in past_results]
+        text = f"**{map_name}**\n-# Past Results: {''.join(past_results_emoji)}\n"
 
         await interaction.response.send_message(
             content=text,
@@ -38,7 +41,6 @@ class MapButtons(discord.ui.View):
     def make_buttons(self):
         if self.MAP_TYPES is None:
             raise NotImplementedError()
-
 
         i = 0
         colours = itertools.cycle([ButtonStyle.red, ButtonStyle.green, ButtonStyle.blurple, ButtonStyle.grey])
@@ -93,9 +95,11 @@ class VotingButtons(discord.ui.View):
         logging.info("%s voted: %s on %s", interaction.user.name, result, self.map)
 
         await self.db_handler.write_line(server_id=interaction.guild_id, username=interaction.user.name, mapname=self.map, result=result, datetime=time.time())
-        # todo: get information about this map and your current streak and display it inline here!
+        _, recent_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=5, username=interaction.user.name)
+        recent_results_emoji = [{"win": "🏆", "loss": "❌", "draw": "🤝"}[result] for _, _, result, _ in recent_results]
 
-        await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**", view=None)
+        await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**\n"
+                                                        f"-# Recent Games: {''.join(recent_results_emoji)}", view=None)
 
 
 class UndoLast(discord.ui.View):
@@ -116,6 +120,6 @@ class UndoLast(discord.ui.View):
 
         await self.db_handler.delete_ids(interaction.guild_id, self.ids)
         await interaction.response.edit_message(
-            content="\n".join(self.lines) + "\n\n*successfully deleted*",
+            content="\n".join(self.lines) + "\n*successfully deleted*",
             view=None
         )

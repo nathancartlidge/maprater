@@ -15,7 +15,7 @@ from discord.ext import commands
 from discord.commands import Option, slash_command
 
 from db_handler import DatabaseHandler
-from constants import MAPS, OW2_MAPS
+from constants import OW2_MAPS, MAPS_LIST
 
 mpl.use("agg")  # force non-interactive backend
 
@@ -130,7 +130,7 @@ class PlotCommands(commands.Cog):
 
         logging.info("sending image")
         await ctx.respond(
-            content="Per-Map " + "Net Wins" if win_loss else "Play Count" + f"for `{user.name}`" if user is not None else "",
+            content=("Per-Map " + "Net Wins" if win_loss else "Play Count") + f" for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
             ephemeral=True
         )
@@ -142,7 +142,7 @@ class PlotCommands(commands.Cog):
         data["winloss-net"] = data["winloss"].replace({"win": 1.0, "draw": 0.0, "loss": -1.0})
 
         if count_only:
-            all_maps = pd.Series(index=[map_name for map_set in MAPS.values() for map_name in map_set], data=0)
+            all_maps = pd.Series(index=MAPS_LIST, data=0)
             if win_loss:
                 grouped = data.groupby("map")["winloss-net"]
                 maps = (grouped.sum() + all_maps).fillna(0).sort_values()
@@ -169,6 +169,9 @@ class PlotCommands(commands.Cog):
             if win_loss:
                 ax.axhline(0, color="white", linewidth=1, zorder=2)
                 ax.set_ylabel("Net Wins")
+                y_min, y_max = ax.get_ylim()
+                y_abs = max(abs(y_min), abs(y_max))
+                ax.set_ylim(-y_abs, y_abs)
             else:
                 ax.set_ylabel("Play Count")
         else:

@@ -70,6 +70,18 @@ def SELECT_LAST_N_USERNAME(n: int):
             ORDER BY rating_id DESC
             LIMIT {min(100, max(1, int(n))):0d}
     """
+def SELECT_LAST_N_USERNAME_MAP(n: int):
+    """Method to select `n` entries from the dataset, filtering by username"""
+    return f"""
+        SELECT ow2.rating_id, users.username, maps.map_name, ow2.result, ow2.datetime
+            FROM ow2
+                INNER JOIN users ON ow2.author_id = users.user_id
+                INNER JOIN maps ON ow2.map_id = maps.map_id
+            WHERE users.username = ?
+            AND maps.map_name = ?
+            ORDER BY rating_id DESC
+            LIMIT {min(100, max(1, int(n))):0d}
+    """
 
 SELECT_USERID_FROM_USERNAME = "SELECT user_id FROM users WHERE username = ?"
 SELECT_MAPID_FROM_MAPNAME = "SELECT map_id FROM maps WHERE map_name = ?"

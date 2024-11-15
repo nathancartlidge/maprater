@@ -16,6 +16,8 @@ MAPS = {
     MapType.PUSH: ["Colosseo", "Esperanca", "Queen St", "Runasapi"],
     MapType.CLASH: ["Hanaoka", "Anubis"]
 }
+MAPS_LIST = [map_name for map_set in MAPS.values() for map_name in map_set]
+MAP_TYPES = [key.name.title() for key in MAPS]
 
 WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
 ROLE_PALETTE = {"Tank": "tab:orange", "Damage": "tab:blue", "Support": "tab:green"}

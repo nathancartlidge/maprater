@@ -84,8 +84,8 @@ class DatabaseHandler:
             await cursor.close()
             await conn.commit()
 
-    async def get_last(self, server_id: int, count: int = 1,
-                       username: Optional[str] = None) -> tuple[list, list]:
+    async def get_last(self, server_id: int, count: int = 1, username: Optional[str] = None,
+                       map_name: Optional[str] = None) -> tuple[list, list]:
         """
         gets the last line of data from the file, if present
         """
@@ -102,9 +102,14 @@ class DatabaseHandler:
             # WARN: This does risk SQL injection! However, given the value is a
             #       bounded int, this should not pose much concern
             if username is not None:
-                query = SELECT_LAST_N_USERNAME(count)
-                await cursor.execute(query, (username,))
-
+                if map_name is not None:
+                    query = SELECT_LAST_N_USERNAME_MAP(count)
+                    await cursor.execute(query, (username, map_name,))
+                else:
+                    query = SELECT_LAST_N_USERNAME(count)
+                    await cursor.execute(query, (username,))
+            elif map_name is not None:
+                raise NotImplementedError()
             else:
                 query = SELECT_LAST_N(count)
                 await cursor.execute(query)

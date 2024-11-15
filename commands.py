@@ -7,9 +7,9 @@ import discord
 from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
-import pandas as pd
 
-from embed_handler import BUTTON_MAPS, MapType, MapButtons, UndoLast
+from constants import MAP_TYPES, MAPS, MapType
+from embed_handler import BUTTON_MAPS, UndoLast
 from db_handler import DatabaseHandler
 
 
@@ -67,10 +67,12 @@ class BaseCommands(commands.Cog):
     @slash_command(description="Get the last n rows of data")
     async def last(
         self, ctx: ApplicationContext,
-        count: Option(int, description="Number of entries to return",
-                      min_value=1, default=1, max_value=100, required=True),
-        user: Option(discord.Member, description="Limit to a particular person",
-                     required=False, default=None)):
+        count: Option(int, description="Number of entries to return", min_value=1, default=1, max_value=100,
+                      required=True),
+        user: Option(discord.Member, description="Limit to a particular person", required=False, default=None),
+        map_type: Option(str, description="Limit to a particular map type", choices=MAP_TYPES, required=False,
+                         default=None)
+    ):
         """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.info("Getting last %s rows - Invoked by %s", count, ctx.author)
         if ctx.guild_id is None:
@@ -79,7 +81,19 @@ class BaseCommands(commands.Cog):
 
         username = str(user.name) if user is not None else None
 
-        ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username)
+        if map_type is not None:
+            # todo: proper map type in database so we don't need to do this
+            ids, lines = await self.db_handler.get_last(ctx.guild_id, 100, username)
+        else:
+            ids, lines = await self.db_handler.get_last(ctx.guild_id, count, username)
+
+        # filter map names
+        if map_type is not None:
+            valid_maps = MAPS[MapType[map_type.upper()]]
+            ids = [i for i, l in zip(ids, lines) if l[1] in valid_maps]
+            lines = [l for l in lines if l[1] in valid_maps]
+            lines = lines[:count]
+
         if len(lines) == 0:
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
         else:
