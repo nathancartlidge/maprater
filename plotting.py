@@ -19,6 +19,7 @@ from db_handler import DatabaseHandler
 from constants import OW2_MAPS, MAPS_LIST
 
 mpl.use("agg")  # force non-interactive backend
+mpl.rcParams['axes.xmargin'] = 0 # tight x axes
 
 class PlotCommands(commands.Cog):
     """Commands related to plotting data"""
@@ -40,7 +41,7 @@ class PlotCommands(commands.Cog):
             raise ValueError("No data available")
         return data
 
-    @slash_command(description="Win/Loss Streak")
+    @slash_command(description="Winrate over time")
     async def winrate(self, ctx: ApplicationContext,
                       user: Option(discord.Member, description="Limit data to a particular person", required=True),
                       window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100)):
@@ -148,6 +149,76 @@ class PlotCommands(commands.Cog):
         await ctx.respond(
             content="Relative Rank" + f" for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
+            ephemeral=True
+        )
+
+    @slash_command(description="Win streaks")
+    async def streak(self, ctx: ApplicationContext,
+                     user: Option(discord.Member, description="Limit to a particular person"),
+                     keep_aspect: Option(bool, description="Maintain aspect ratio in plot", default=True)):
+        data = await self.get_pandas(ctx, user)
+
+        # slightly fancy algorithm to make the shape: we want triangles not lines!
+        i = 0
+        streak_counter = 0
+        data_x, data_y = [], []
+        for _, row in data.iterrows():
+            if row.winloss == "win":
+                if streak_counter > 0:
+                    streak_counter += 1
+                else:
+                    data_x.append(i)
+                    data_y.append(0)
+                    streak_counter = 1
+            elif row.winloss == "loss":
+                if streak_counter < 0:
+                    streak_counter -= 1
+                else:
+                    data_x.append(i)
+                    data_y.append(0)
+                    streak_counter = -1
+            else:
+                data_x.append(i)
+                data_y.append(0)
+                streak_counter = 0
+
+            i += 1
+            data_x.append(i)
+            data_y.append(streak_counter)
+
+        data_x = np.array(data_x)
+        data_y = np.array(data_y)
+        best_streak = data_y.max()
+        worst_streak = data_y.min()
+
+        logging.info("making plot")
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=(10, 4))
+
+        ax.plot(data_x, data_y, color="white")
+        ax.fill_between(data_x, data_y, 0, where=data_y >= 0, color="tab:green", alpha=0.3)
+        ax.fill_between(data_x, data_y, 0, where=data_y <= 0, color="tab:red", alpha=0.3)
+        ax.axhline(0, color="white", linewidth=1.5, zorder=2)
+        ax.axhline(best_streak, color="tab:green", linestyle="dashed", linewidth=1, zorder=-1)
+        ax.axhline(worst_streak, color="tab:red", linestyle="dashed", linewidth=1, zorder=-1)
+
+        ax.set_ylabel("Streak")
+
+        ax.autoscale(enable=True, axis='x', tight=True)
+        y_min, y_max = ax.get_ylim()
+        y_abs = max(abs(y_min), abs(y_max))
+        ax.set_ylim(-y_abs, y_abs)
+
+        if keep_aspect:
+            ax.axis("equal")
+
+        buffer = self._export_figure(fig)
+        logging.info("sending image")
+        await ctx.respond(
+            content=f"Win-streak for `{user.name}`\n"
+                    f"-# 🏆 Longest win streak: **{best_streak} games**\n"
+                    f"-# ❌ Longest loss streak: **{abs(worst_streak)} games**",
+            files=[discord.File(fp=buffer, filename="streak.png")],
             ephemeral=True
         )
 
