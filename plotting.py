@@ -6,6 +6,7 @@ import logging
 import discord
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -25,10 +26,7 @@ class PlotCommands(commands.Cog):
         super().__init__()
         self.db_handler = db_handler
 
-    @slash_command(description="Win/Loss Streak")
-    async def winrate(self, ctx: ApplicationContext,
-                      user: Option(discord.Member, description="Limit data to a particular person", required=True),
-                      window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100)):
+    async def get_pandas(self, ctx: ApplicationContext, user: discord.Member | None = None):
         # get data for this user
         logging.info("fetching data")
         data = self.db_handler.get_pandas_data(ctx.guild_id)
@@ -39,8 +37,15 @@ class PlotCommands(commands.Cog):
                 content=":warning: No matching data found - Cannot create graphs",
                 ephemeral=True
             )
+            raise ValueError("No data available")
+        return data
 
+    @slash_command(description="Win/Loss Streak")
+    async def winrate(self, ctx: ApplicationContext,
+                      user: Option(discord.Member, description="Limit data to a particular person", required=True),
+                      window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100)):
         # make the plot
+        data = await self.get_pandas(ctx, user)
         buffer = self.get_winrate_figure(data, window_size)
 
         logging.info("sending image")
@@ -87,19 +92,7 @@ class PlotCommands(commands.Cog):
     async def map_winrate(self,
                           ctx: ApplicationContext,
                           user: Option(discord.Member, description="Limit data to a particular person", default=None)):
-        # get data for this user
-        logging.info("fetching data")
-        data = self.db_handler.get_pandas_data(ctx.guild_id)
-        if user is not None:
-            data = data[data.author == user.name]
-
-        if data.shape[0] == 0:
-            await ctx.respond(
-                content=":warning: No matching data found - Cannot create graphs",
-                ephemeral=True
-            )
-
-        # make the plot
+        data = await self.get_pandas(ctx, user)
         buffer = self.get_map_winrate_figure(data)
 
         logging.info("sending image")
@@ -111,26 +104,49 @@ class PlotCommands(commands.Cog):
 
     @slash_command(description="Per-Map Play Count")
     async def map_play_count(self, ctx: ApplicationContext,
-                             user: Option(discord.Member, description="Limit data to a particular person", default=None),
+                             user: Option(discord.Member, description="Limit to a particular person", default=None),
                              win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False)):
-        # get data for this user
-        logging.info("fetching data")
-        data = self.db_handler.get_pandas_data(ctx.guild_id)
-        if user is not None:
-            data = data[data.author == user.name]
-
-        if data.shape[0] == 0:
-            await ctx.respond(
-                content=":warning: No matching data found - Cannot create graphs",
-                ephemeral=True
-            )
-
-        # make the plot
+        data = await self.get_pandas(ctx, user)
         buffer = self.get_map_winrate_figure(data, count_only=True, win_loss=win_loss)
 
         logging.info("sending image")
         await ctx.respond(
             content=("Per-Map " + "Net Wins" if win_loss else "Play Count") + f" for `{user.name}`" if user is not None else "",
+            files=[discord.File(fp=buffer, filename="map_count.png")],
+            ephemeral=True
+        )
+
+    @slash_command(description="Cumulative Wins")
+    async def relative_rank(self, ctx: ApplicationContext,
+                            user: Option(discord.Member, description="Limit to a particular person"),
+                            real_dates: Option(bool, description="Use real dates", default=False)):
+        # get data for this user
+        data = await self.get_pandas(ctx, user)
+
+        # make the plot
+        data["winloss-net"] = data["winloss"].replace({"win": 1.0, "draw": 0.0, "loss": -1.0})
+        data["cumulative"] = data["winloss-net"].cumsum()
+
+        logging.info("making plot")
+        plt.style.use('dark_background')
+        fig, ax = plt.subplots(figsize=(10, 4))
+
+        if real_dates:
+            sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-post', ax=ax)
+            ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+        else:
+            data.reset_index(drop=True, inplace=True)
+            sns.lineplot(data["cumulative"], drawstyle='steps-post', ax=ax)
+
+        ax.axhline(0, color="white", linewidth=1, zorder=2)
+        ax.set_ylabel("Net Wins")
+
+        logging.info("making image")
+        buffer = self._export_figure(fig)
+
+        logging.info("sending image")
+        await ctx.respond(
+            content="Relative Rank" + f" for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
             ephemeral=True
         )
