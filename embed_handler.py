@@ -2,8 +2,6 @@
 import itertools
 import time
 import logging
-from enum import Enum
-from functools import partial
 
 import discord
 from discord import ButtonStyle
@@ -11,6 +9,8 @@ from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
 from constants import MAPS, MapType
+from plotting import PlotCommands
+
 
 class MapButtons(discord.ui.View):
     """Persistent map rating buttons"""
@@ -74,7 +74,7 @@ BUTTON_MAPS = {
 class VotingButtons(discord.ui.View):
     """Provides the initialised voting buttons"""
     def __init__(self, voted_map, db_handler: DatabaseHandler):
-        super().__init__()
+        super().__init__(timeout=1200) # stay active for 20 minutes
         self.map = voted_map
         self.db_handler = db_handler
 
@@ -100,6 +100,66 @@ class VotingButtons(discord.ui.View):
 
         await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**\n"
                                                         f"-# Recent Games: {''.join(recent_results_emoji)}", view=None)
+
+
+class FakeContext:
+    def __init__(self, interaction: Interaction):
+        self.defer = interaction.response.defer
+        self.respond = interaction.respond
+        self.guild_id = interaction.guild_id
+        self.user = interaction.user
+
+
+class PlotButtons(discord.ui.View):
+    """Persistent plot buttons"""
+    def __init__(self, db_handler: DatabaseHandler) -> None:
+        super().__init__(timeout=None)
+        self.db_handler = db_handler
+        self.plot_commands = PlotCommands(db_handler)
+
+    @discord.ui.button(label="Per-Map Winrate", custom_id="pmwr", style=ButtonStyle.blurple)
+    async def _pmwr(self, _, interaction: Interaction):
+        await self.plot_commands.map_winrate.callback(
+            self=self.plot_commands,
+            ctx=FakeContext(interaction),
+            user=interaction.user
+        )
+
+    @discord.ui.button(label="Per-Map Play Count", custom_id="pmpc", style=ButtonStyle.blurple)
+    async def _pmpc(self, _, interaction: Interaction):
+        await self.plot_commands.map_play_count.callback(
+            self=self.plot_commands,
+            ctx=FakeContext(interaction),
+            user=interaction.user,
+            win_loss=False
+        )
+
+    @discord.ui.button(label="Rolling Winrate", custom_id="rw", style=ButtonStyle.green)
+    async def _rw(self, _, interaction: Interaction):
+        await self.plot_commands.winrate.callback(
+            self=self.plot_commands,
+            ctx=FakeContext(interaction),
+            user=interaction.user,
+            window_size=20
+        )
+
+    @discord.ui.button(label="Relative Rank", custom_id="rr", style=ButtonStyle.green)
+    async def _rr(self, _, interaction: Interaction):
+        await self.plot_commands.relative_rank.callback(
+            self=self.plot_commands,
+            ctx=FakeContext(interaction),
+            user=interaction.user,
+            real_dates=False
+        )
+
+    @discord.ui.button(label="Streaks", custom_id="s", style=ButtonStyle.red)
+    async def _s(self, _, interaction: Interaction):
+        await self.plot_commands.streak.callback(
+            self=self.plot_commands,
+            ctx=FakeContext(interaction),
+            user=interaction.user,
+            keep_aspect=True
+        )
 
 
 class UndoLast(discord.ui.View):

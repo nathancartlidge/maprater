@@ -1,7 +1,8 @@
 import discord
 import logging
 
-from embed_handler import BUTTON_MAPS, MapButtons
+from embed_handler import BUTTON_MAPS, MapButtons, PlotButtons
+
 
 class MapRater(discord.Bot):
     def __init__(self, db_handler, description="Overwatch Map Rating", *args, **options):
@@ -17,6 +18,7 @@ class MapRater(discord.Bot):
         # enable persistence for the map buttons
         for cls in BUTTON_MAPS.values():
             self.add_view(cls(self.db_handler))
+        self.add_view(PlotButtons(self.db_handler))
 
     async def on_connect(self):
         logging.info("Syncing commands")

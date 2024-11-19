@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from discord import ApplicationContext
+from discord import ApplicationContext, Interaction
 from discord.ext import commands
 from discord.commands import Option, slash_command
 
@@ -31,7 +31,8 @@ class PlotCommands(commands.Cog):
         # get data for this user
         logging.info("fetching data")
         data = self.db_handler.get_pandas_data(ctx.guild_id)
-        data = data[data.author == user.name]
+        if user is not None:
+            data = data[data.author == user.name]
 
         if data.shape[0] == 0:
             await ctx.respond(
@@ -45,6 +46,9 @@ class PlotCommands(commands.Cog):
     async def winrate(self, ctx: ApplicationContext,
                       user: Option(discord.Member, description="Limit data to a particular person", required=True),
                       window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100)):
+        # support both forms of ctx
+        await ctx.defer(ephemeral=True)
+
         # make the plot
         data = await self.get_pandas(ctx, user)
         buffer = self.get_winrate_figure(data, window_size)
@@ -90,15 +94,16 @@ class PlotCommands(commands.Cog):
         return buffer
 
     @slash_command(description="Per-Map Winrate")
-    async def map_winrate(self,
-                          ctx: ApplicationContext,
+    async def map_winrate(self, ctx: ApplicationContext,
                           user: Option(discord.Member, description="Limit data to a particular person", default=None)):
+        # support both forms of ctx
+        await ctx.defer(ephemeral=True)
+
         data = await self.get_pandas(ctx, user)
         buffer = self.get_map_winrate_figure(data)
 
         logging.info("sending image")
-        await ctx.respond(
-            content=f"Normalised Per-Map Winrate for `{user.name}`" if user is not None else "Normalised Per-Map Winrate",
+        await ctx.respond(            content=f"Normalised Per-Map Winrate for `{user.name}`" if user is not None else "Normalised Per-Map Winrate",
             files=[discord.File(fp=buffer, filename="map_winrate.png")],
             ephemeral=True
         )
@@ -107,12 +112,14 @@ class PlotCommands(commands.Cog):
     async def map_play_count(self, ctx: ApplicationContext,
                              user: Option(discord.Member, description="Limit to a particular person", default=None),
                              win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False)):
+        # support both forms of ctx
+        await ctx.defer(ephemeral=True)
+
         data = await self.get_pandas(ctx, user)
         buffer = self.get_map_winrate_figure(data, count_only=True, win_loss=win_loss)
 
         logging.info("sending image")
-        await ctx.respond(
-            content=("Per-Map " + "Net Wins" if win_loss else "Play Count") + f" for `{user.name}`" if user is not None else "",
+        await ctx.respond(            content=("Per-Map " + "Net Wins" if win_loss else "Play Count") + f" for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
             ephemeral=True
         )
@@ -121,6 +128,9 @@ class PlotCommands(commands.Cog):
     async def relative_rank(self, ctx: ApplicationContext,
                             user: Option(discord.Member, description="Limit to a particular person"),
                             real_dates: Option(bool, description="Use real dates", default=False)):
+        # support both forms of ctx
+        await ctx.defer(ephemeral=True)
+
         # get data for this user
         data = await self.get_pandas(ctx, user)
 
@@ -146,8 +156,7 @@ class PlotCommands(commands.Cog):
         buffer = self._export_figure(fig)
 
         logging.info("sending image")
-        await ctx.respond(
-            content="Relative Rank" + f" for `{user.name}`" if user is not None else "",
+        await ctx.respond(            content="Relative Rank" + f" for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
             ephemeral=True
         )
@@ -156,6 +165,9 @@ class PlotCommands(commands.Cog):
     async def streak(self, ctx: ApplicationContext,
                      user: Option(discord.Member, description="Limit to a particular person"),
                      keep_aspect: Option(bool, description="Maintain aspect ratio in plot", default=True)):
+        # support both forms of ctx
+        await ctx.defer(ephemeral=True)
+
         data = await self.get_pandas(ctx, user)
 
         # slightly fancy algorithm to make the shape: we want triangles not lines!
@@ -214,8 +226,8 @@ class PlotCommands(commands.Cog):
 
         buffer = self._export_figure(fig)
         logging.info("sending image")
-        await ctx.respond(
-            content=f"Win-streak for `{user.name}`\n"
+
+        await ctx.respond(            content=f"Win-streak for `{user.name}`\n"
                     f"-# 🏆 Longest win streak: **{best_streak} games**\n"
                     f"-# ❌ Longest loss streak: **{abs(worst_streak)} games**",
             files=[discord.File(fp=buffer, filename="streak.png")],

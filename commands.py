@@ -9,7 +9,7 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 
 from constants import MAP_TYPES, MAPS, MapType
-from embed_handler import BUTTON_MAPS, UndoLast
+from embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
 from db_handler import DatabaseHandler
 
 
@@ -30,7 +30,9 @@ class BaseCommands(commands.Cog):
 
         logging.info("Created buttons - Invoked by %s", ctx.author)
         for map_types, cls in BUTTON_MAPS.items():
-            await ctx.respond(content=f"## {map_types}", view=cls(self.db_handler))
+            await ctx.respond(content=f"### {map_types}", view=cls(self.db_handler))
+
+        await ctx.respond(content=f"### Plot Commands", view=PlotButtons(self.db_handler))
 
     @slash_command(description="Get raw data")
     async def data(self, ctx: ApplicationContext,
