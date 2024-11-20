@@ -69,7 +69,7 @@ class PlotCommands(commands.Cog):
         # make the plot
         logging.info("making plot")
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig, ax = plt.subplots(figsize=(12, 4))
 
         # benchmark: 50% winrate
         ax.axhline(50, color="white", linewidth=1)
@@ -140,7 +140,7 @@ class PlotCommands(commands.Cog):
 
         logging.info("making plot")
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig, ax = plt.subplots(figsize=(12, 4))
 
         if real_dates:
             sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-post', ax=ax)
@@ -205,7 +205,7 @@ class PlotCommands(commands.Cog):
 
         logging.info("making plot")
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig, ax = plt.subplots(figsize=(12, 4))
 
         ax.plot(data_x, data_y, color="white")
         ax.fill_between(data_x, data_y, 0, where=data_y >= 0, color="tab:green", alpha=0.3)
@@ -260,7 +260,7 @@ class PlotCommands(commands.Cog):
 
         logging.info("making plot")
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(10, 4))
+        fig, ax = plt.subplots(figsize=(12, 4))
 
         if count_only:
             sns.barplot(x=maps.index, y=maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"},
@@ -510,7 +510,7 @@ class PlotCommands(commands.Cog):
 
     @staticmethod
     def _export_figure(fig):
-        fig.set_dpi(400)
+        fig.set_dpi(500)
         fig.tight_layout()
 
         buffer = BytesIO()
