@@ -1,7 +1,9 @@
 """Implements basic bot commands"""
-
+import time
+from datetime import datetime
 from io import BytesIO
 import logging
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import ApplicationContext
@@ -142,6 +144,33 @@ class BaseCommands(commands.Cog):
                     content="\n".join(lines),
                     ephemeral=True
                 )
+
+    @slash_command(description="Get a summary of your play today")
+    async def today(self, ctx: ApplicationContext):
+        """Prints the last `n` pieces of data to discord, with option to delete"""
+        logging.info("Getting session - Invoked by %s", ctx.author)
+        if ctx.guild_id is None:
+            await ctx.respond(":warning: This bot does not support DMs")
+            return
+
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, 25, ctx.user.name)
+        min_time = datetime.now(tz=ZoneInfo("localtime")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        lines = [l for l in lines if l[3] >= min_time]
+
+        if len(lines) == 0:
+            await ctx.respond(content=":warning: No ratings found today!", ephemeral=True)
+        else:
+            games_summary = self._format_lines(lines, skip_username=True)
+            wins = sum([r == "win" for (_, _, r, _) in lines])
+            losses = sum([r == "loss" for (_, _, r, _) in lines])
+            games = len(lines)
+            emoji = '🥳' if wins > losses else '🥲'
+            games_summary[0] = f"### Today: {emoji}\n-# Net Wins: **{wins - losses:+}** / Winrate: **{100 * wins / games:.0f}%** (played **{games}**, won **{wins}**)"
+
+            await ctx.respond(
+                content="\n".join(games_summary),
+                ephemeral=True
+            )
 
     def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""
