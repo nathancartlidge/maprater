@@ -7,6 +7,7 @@ import sqlite3
 import aiosqlite
 import pandas as pd
 
+from constants import SEASONS
 from queries import *
 
 class DatabaseHandler:
@@ -152,7 +153,7 @@ class DatabaseHandler:
 
         return count
 
-    def get_pandas_data(self, server_id: int):
+    def get_pandas_data(self, server_id: int, season: int | None = None):
         """
         reads the csv file into a Pandas df
         note that this function is *not* async
@@ -161,7 +162,10 @@ class DatabaseHandler:
         logging.info("Getting data as Pandas")
 
         with sqlite3.connect(self.get_db_name(server_id)) as conn:
-            data = pd.read_sql_query(SELECT_ALL_PANDAS, conn)
+            if season and (season + 1 in SEASONS):
+                data = pd.read_sql_query(SELECT_ALL_PANDAS_SEASON, conn, params=[SEASONS[season], SEASONS[season + 1]])
+            else:
+                data = pd.read_sql_query(SELECT_ALL_PANDAS, conn)
 
         data["time"] = pd.to_datetime(data["time"])
         return data

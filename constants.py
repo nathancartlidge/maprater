@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 
 class MapType(Enum):
@@ -27,3 +28,18 @@ OW2_MAPS = ["Queen St", "Circuit", "Colosseo", "Midtown", "Paraiso",
             "Samoa", "Runasapi", "Hanaoka", "Anubis"]
 
 TTL = 60
+
+SEASONS = {
+    13: "2024-10-15T19:00:00",
+    14: "2024-12-10T19:00:00",
+    15: "2025-02-11T19:00:00"
+}
+
+
+class Seasons(Enum):
+    Thirteen = 13
+    Fourteen = 14
+    All = None
+
+
+LATEST_SEASON = Seasons.Fourteen

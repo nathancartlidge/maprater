@@ -49,6 +49,14 @@ SELECT users.username as author, maps.map_name as map, ow2.result as winloss, da
         INNER JOIN users ON ow2.author_id = users.user_id
         INNER JOIN maps ON ow2.map_id = maps.map_id 
 """
+SELECT_ALL_PANDAS_SEASON = """
+SELECT users.username as author, maps.map_name as map, ow2.result as winloss, datetime(ow2.datetime, 'unixepoch') as time
+    FROM ow2
+        INNER JOIN users ON ow2.author_id = users.user_id
+        INNER JOIN maps ON ow2.map_id = maps.map_id
+    WHERE ow2.datetime >= unixepoch(?)
+      AND ow2.datetime < unixepoch(?)
+"""
 def SELECT_LAST_N(n: int):
     """Method to select `n` entries from the dataset"""
     return f"""

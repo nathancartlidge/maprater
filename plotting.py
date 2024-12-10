@@ -16,10 +16,13 @@ from discord.ext import commands
 from discord.commands import Option, slash_command
 
 from db_handler import DatabaseHandler
-from constants import OW2_MAPS, MAPS_LIST
+from constants import LATEST_SEASON, OW2_MAPS, MAPS_LIST, Seasons
 
 mpl.use("agg")  # force non-interactive backend
 mpl.rcParams['axes.xmargin'] = 0 # tight x axes
+# hide top/right spines
+mpl.rcParams['axes.spines.right'] = False
+mpl.rcParams['axes.spines.top'] = False
 
 class PlotCommands(commands.Cog):
     """Commands related to plotting data"""
@@ -27,10 +30,10 @@ class PlotCommands(commands.Cog):
         super().__init__()
         self.db_handler = db_handler
 
-    async def get_pandas(self, ctx: ApplicationContext, user: discord.Member | None = None):
+    async def get_pandas(self, ctx: ApplicationContext, user: discord.Member | None = None, season: int | None = None):
         # get data for this user
         logging.info("fetching data")
-        data = self.db_handler.get_pandas_data(ctx.guild_id)
+        data = self.db_handler.get_pandas_data(ctx.guild_id, season=season)
         if user is not None:
             data = data[data.author == user.name]
 
@@ -45,12 +48,13 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Winrate over time")
     async def winrate(self, ctx: ApplicationContext,
                       user: Option(discord.Member, description="Limit data to a particular person", required=True),
-                      window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100)):
+                      window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100),
+                      season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
         # make the plot
-        data = await self.get_pandas(ctx, user)
+        data = await self.get_pandas(ctx, user, season.value)
         buffer = self.get_winrate_figure(data, window_size)
 
         logging.info("sending image")
@@ -95,11 +99,12 @@ class PlotCommands(commands.Cog):
 
     @slash_command(description="Per-Map Winrate")
     async def map_winrate(self, ctx: ApplicationContext,
-                          user: Option(discord.Member, description="Limit data to a particular person", default=None)):
+                          user: Option(discord.Member, description="Limit data to a particular person", default=None),
+                          season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user)
+        data = await self.get_pandas(ctx, user, season.value)
         buffer = self.get_map_winrate_figure(data)
 
         logging.info("sending image")
@@ -111,11 +116,12 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Per-Map Play Count")
     async def map_play_count(self, ctx: ApplicationContext,
                              user: Option(discord.Member, description="Limit to a particular person", default=None),
-                             win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False)):
+                             win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False),
+                             season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user)
+        data = await self.get_pandas(ctx, user, season.value)
         buffer = self.get_map_winrate_figure(data, count_only=True, win_loss=win_loss)
 
         logging.info("sending image")
@@ -127,12 +133,12 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Cumulative Wins")
     async def relative_rank(self, ctx: ApplicationContext,
                             user: Option(discord.Member, description="Limit to a particular person"),
-                            real_dates: Option(bool, description="Use real dates", default=False)):
+                            real_dates: Option(bool, description="Use real dates", default=False),
+                            season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
-        # get data for this user
-        data = await self.get_pandas(ctx, user)
+        data = await self.get_pandas(ctx, user, season.value)
 
         # make the plot
         data["winloss-net"] = data["winloss"].replace({"win": 1.0, "draw": 0.0, "loss": -1.0})
@@ -143,13 +149,13 @@ class PlotCommands(commands.Cog):
         fig, ax = plt.subplots(figsize=(12, 4))
 
         if real_dates:
-            sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-post', ax=ax)
+            sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-mid', ax=ax, linewidth=2)
             ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
         else:
             data.reset_index(drop=True, inplace=True)
-            sns.lineplot(data["cumulative"], drawstyle='steps-post', ax=ax)
+            sns.lineplot(data["cumulative"], drawstyle='steps-mid', ax=ax, linewidth=2)
 
-        ax.axhline(0, color="white", linewidth=1, zorder=2)
+        ax.axhline(0, color="white", linewidth=1, zorder=0, linestyle="dashed")
         ax.set_ylabel("Net Wins")
 
         logging.info("making image")
@@ -164,11 +170,12 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Win streaks")
     async def streak(self, ctx: ApplicationContext,
                      user: Option(discord.Member, description="Limit to a particular person"),
-                     keep_aspect: Option(bool, description="Maintain aspect ratio in plot", default=True)):
+                     keep_aspect: Option(bool, description="Maintain aspect ratio in plot", default=True),
+                     season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user)
+        data = await self.get_pandas(ctx, user, season.value)
 
         # slightly fancy algorithm to make the shape: we want triangles not lines!
         i = 0
@@ -281,7 +288,7 @@ class PlotCommands(commands.Cog):
             ax.set_ylabel("Winrate (%)")
 
         ax.set_xlabel("Map")
-        ax.tick_params(axis='x', rotation=45)
+        plt.setp(ax.get_xticklabels(), rotation=45, ha="right", va="center", rotation_mode="anchor")
 
         logging.info("making image")
         buffer = self._export_figure(fig)
