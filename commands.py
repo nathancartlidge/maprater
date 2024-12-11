@@ -6,11 +6,12 @@ import logging
 from zoneinfo import ZoneInfo
 
 import discord
+import numpy as np
 from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from constants import MAP_TYPES, MAPS, MapType
+from constants import FIRE_RANKINGS, LATEST_SEASON, MAP_TYPES, MAPS, MapType, Seasons
 from embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
 from db_handler import DatabaseHandler
 
@@ -171,6 +172,52 @@ class BaseCommands(commands.Cog):
                 content="\n".join(games_summary),
                 ephemeral=True
             )
+
+    @slash_command(description="How does your map pick-rate compare to Rein maps?")
+    async def anti_rein(self, ctx: ApplicationContext,
+                        user: Option(discord.Member, description="Limit to a particular person", default=None),
+                        season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+        """Prints the last `n` pieces of data to discord, with option to delete"""
+        logging.info("Getting anti-rein - Invoked by %s", ctx.author)
+        await ctx.defer(ephemeral=True)
+
+        if ctx.guild_id is None:
+            await ctx.respond(":warning: This bot does not support DMs")
+            return
+
+        data = self.db_handler.get_pandas_data(ctx.guild_id, season.value)
+        if user is not None:
+            data = data[data.author == user.name]
+
+        if data.shape[0] == 0:
+            await ctx.respond(
+                content=":warning: No matching data found - Cannot create graphs",
+                ephemeral=True
+            )
+            raise ValueError("No data available")
+
+        desc = {"Bad": -1, "Okay": 0, "Good": 2}
+        all_rankings = [desc[r] for r in FIRE_RANKINGS.values()]
+        expected_quality = sum(all_rankings) / len(all_rankings)
+        actual_quality = sum([desc[FIRE_RANKINGS[r["map"]]] for _, r in data.iterrows()]) / data.shape[0]
+
+        if actual_quality > expected_quality:
+            line = "👍 The Overwatch Team supports Reinhardt!"
+        else:
+            line = "👎 The Overwatch Team hates Reinhardt!"
+
+        # simulate it!
+        scores = np.random.choice(all_rankings, size=(50_000, data.shape[0])).mean(axis=1)
+        scores.sort()
+
+        await ctx.respond(
+            content=f"{line}"
+                    f"\n-# (assuming a uniform distribution for map selection as the baseline)"
+                    f"\n> Expected Quality: **{expected_quality:.2f}** *(n={data.shape[0]}, σ={scores.std():.3f})*"
+                    f"\n> Actual Quality: **{actual_quality:.2f}** "
+                    f"*(z=**{(actual_quality - expected_quality) / scores.std():.1f}**)*",
+            ephemeral=True
+        )
 
     def _format_lines(self, lines: list, skip_username: bool = False):
         """convert lines into pretty strings"""

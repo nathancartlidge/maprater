@@ -16,7 +16,7 @@ from discord.ext import commands
 from discord.commands import Option, slash_command
 
 from db_handler import DatabaseHandler
-from constants import LATEST_SEASON, OW2_MAPS, MAPS_LIST, Seasons
+from constants import FIRE_RANKINGS, LATEST_SEASON, OW2_MAPS, MAPS_LIST, Seasons
 
 mpl.use("agg")  # force non-interactive backend
 mpl.rcParams['axes.xmargin'] = 0 # tight x axes
@@ -100,12 +100,13 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Per-Map Winrate")
     async def map_winrate(self, ctx: ApplicationContext,
                           user: Option(discord.Member, description="Limit data to a particular person", default=None),
+                          rein_colours: Option(bool, description="Colour by map quality for Reinhardt", default=None),
                           season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
         data = await self.get_pandas(ctx, user, season.value)
-        buffer = self.get_map_winrate_figure(data)
+        buffer = self.get_map_winrate_figure(data, rein_colours=rein_colours)
 
         logging.info("sending image")
         await ctx.respond(            content=f"Normalised Per-Map Winrate for `{user.name}`" if user is not None else "Normalised Per-Map Winrate",
@@ -117,12 +118,14 @@ class PlotCommands(commands.Cog):
     async def map_play_count(self, ctx: ApplicationContext,
                              user: Option(discord.Member, description="Limit to a particular person", default=None),
                              win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False),
+                             rein_colours: Option(bool, description="Colour by map quality for Reinhardt",
+                                                  default=None),
                              season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
         data = await self.get_pandas(ctx, user, season.value)
-        buffer = self.get_map_winrate_figure(data, count_only=True, win_loss=win_loss)
+        buffer = self.get_map_winrate_figure(data, count_only=True, win_loss=win_loss, rein_colours=rein_colours)
 
         logging.info("sending image")
         await ctx.respond(            content=("Per-Map " + "Net Wins" if win_loss else "Play Count") + f" for `{user.name}`" if user is not None else "",
@@ -241,7 +244,7 @@ class PlotCommands(commands.Cog):
             ephemeral=True
         )
 
-    def get_map_winrate_figure(self, data, count_only: bool = False, win_loss: bool = False):
+    def get_map_winrate_figure(self, data, count_only: bool = False, win_loss: bool = False, rein_colours: bool = False):
         """per-map winrate plot"""
         logging.info("calculating winrate")
         data["winloss-score"] = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
@@ -264,13 +267,16 @@ class PlotCommands(commands.Cog):
             maps = ((sum + 1) / (count + 2)).sort_values()
 
         game = np.array(["OW2" if i in OW2_MAPS else "OW1" for i in maps.index])
+        rein_score = np.array([FIRE_RANKINGS[i] for i in maps.index])
+
+        palette = {"OW1": "#991a5b", "OW2": "#f26f4c", "Bad": "tab:red", "Okay": "tab:orange", "Good": "tab:green"}
 
         logging.info("making plot")
         plt.style.use('dark_background')
         fig, ax = plt.subplots(figsize=(12, 4))
 
         if count_only:
-            sns.barplot(x=maps.index, y=maps.values, hue=game, palette={"OW1": "#991a5b", "OW2": "#f26f4c"},
+            sns.barplot(x=maps.index, y=maps.values, hue=rein_score if rein_colours else game, palette=palette,
                         dodge=False, ax=ax)
             if win_loss:
                 ax.axhline(0, color="white", linewidth=1, zorder=2)

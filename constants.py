@@ -43,3 +43,36 @@ class Seasons(Enum):
 
 
 LATEST_SEASON = Seasons.Fourteen
+
+FIRE_RANKINGS = {
+    "Antarctic": "Good",
+    "Busan": "Good",
+    "Ilios": "Bad",
+    "Lijiang": "Good",
+    "Nepal": "Good",
+    "Oasis": "Good",
+    "Samoa": "Okay",
+    "Circuit": "Good",
+    "Dorado": "Bad",
+    "Havana": "Good",
+    "Junkertown": "Bad",
+    "Rialto": "Good",
+    "Route 66": "Okay",
+    "Shambali": "Good",
+    "Gibraltar": "Bad",
+    "Junk City": "Okay",
+    "Suravasa": "Good",
+    "Blizzard": "Bad",
+    "Eichenwalde": "Good",
+    "Hollywood": "Bad",
+    "King's": "Good",
+    "Midtown": "Okay",
+    "Numbani": "Bad",
+    "Paraiso": "Bad",
+    "Colosseo": "Good",
+    "Esperanca": "Bad",
+    "Queen St": "Bad",
+    "Runasapi": "Good",
+    "Hanaoka": "Good",
+    "Anubis": "Okay"
+}
