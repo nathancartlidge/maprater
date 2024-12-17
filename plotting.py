@@ -1,22 +1,22 @@
 """Provides all plotting functionality"""
 
-from io import BytesIO
 import logging
+from io import BytesIO
 
 import discord
 import matplotlib as mpl
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
-from discord import ApplicationContext, Interaction
-from discord.ext import commands
+from discord import ApplicationContext
 from discord.commands import Option, slash_command
+from discord.ext import commands
+from matplotlib.ticker import MaxNLocator
 
+from constants import FIRE_RANKINGS, LATEST_SEASON, MAPS_LIST, OW2_MAPS, Seasons
 from db_handler import DatabaseHandler
-from constants import FIRE_RANKINGS, LATEST_SEASON, OW2_MAPS, MAPS_LIST, Seasons
 
 mpl.use("agg")  # force non-interactive backend
 mpl.rcParams['axes.xmargin'] = 0 # tight x axes
@@ -155,11 +155,34 @@ class PlotCommands(commands.Cog):
             sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-mid', ax=ax, linewidth=2)
             ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
         else:
-            data.reset_index(drop=True, inplace=True)
-            sns.lineplot(data["cumulative"], drawstyle='steps-mid', ax=ax, linewidth=2)
+            # add an extra point at t=-1 for clarity
+            data = pd.concat([
+                pd.DataFrame(index=[-1], data={"cumulative": 0}),
+                data,
+                pd.DataFrame(index=[9999], data={"cumulative": data["cumulative"].iloc[-1]})
+            ], ignore_index=True).reset_index(drop=True)
+            sns.lineplot(x=data.index, y=data["cumulative"], drawstyle='steps-post', ax=ax, linewidth=2)
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+            x_min, x_max = ax.get_xlim()
+            ax.set_xlim(x_min, x_max - 0.5)
+            ax.grid(axis="x", color="white", alpha=0.5)
 
         ax.axhline(0, color="white", linewidth=1, zorder=0, linestyle="dashed")
+        ax.axhline(data["cumulative"].min(), color="tab:red", linewidth=1, zorder=0, linestyle="dashed", label="Min")
+        ax.axhline(data["cumulative"].max(), color="tab:green", linewidth=1, zorder=0, linestyle="dashed", label="Max")
+        ax.axhline(data["cumulative"].mean(), color="tab:pink", linewidth=1, zorder=0, linestyle="dashdot",
+                   label="Mean")
+        ax.axhline(data["cumulative"].median(), color="tab:olive", linewidth=1, zorder=0, linestyle="dashdot",
+                   label="Median")
+
         ax.set_ylabel("Net Wins")
+        legend = ax.legend()
+
+        # fancy legend
+        legend.get_frame().set_alpha(0.3)
+        legend.get_frame().set_edgecolor("white")
+        legend.get_frame().set_linewidth(1)
+        legend.get_frame().set_boxstyle("round,pad=0.4,rounding_size=0.3")
 
         logging.info("making image")
         buffer = self._export_figure(fig)

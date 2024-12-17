@@ -4,6 +4,7 @@ from datetime import datetime
 from io import BytesIO
 import logging
 from zoneinfo import ZoneInfo
+from statistics import NormalDist
 
 import discord
 import numpy as np
@@ -201,21 +202,29 @@ class BaseCommands(commands.Cog):
         expected_quality = sum(all_rankings) / len(all_rankings)
         actual_quality = sum([desc[FIRE_RANKINGS[r["map"]]] for _, r in data.iterrows()]) / data.shape[0]
 
-        if actual_quality > expected_quality:
-            line = "👍 The Overwatch Team supports Reinhardt!"
-        else:
-            line = "👎 The Overwatch Team hates Reinhardt!"
-
         # simulate it!
         scores = np.random.choice(all_rankings, size=(50_000, data.shape[0])).mean(axis=1)
         scores.sort()
 
+        z_score = (actual_quality - expected_quality) / scores.std()
+
+        if z_score < -2:
+            opinion = "**hates**"
+        elif -2 <= -z_score < -1:
+            opinion = "_might_ dislike"
+        elif -1 <= z_score < 1:
+            opinion = "is neutral about"
+        elif 1 <= z_score < 2:
+            opinion = "_might_ like"
+        else:
+            opinion = "**loves**"
+
         await ctx.respond(
-            content=f"{line}"
+            content=f"The Overwatch team {opinion} Reinhardt! (p={100 * (1 - NormalDist().cdf(abs(z_score))):.2f}%)"
                     f"\n-# (assuming a uniform distribution for map selection as the baseline)"
                     f"\n> Expected Quality: **{expected_quality:.2f}** *(n={data.shape[0]}, σ={scores.std():.3f})*"
                     f"\n> Actual Quality: **{actual_quality:.2f}** "
-                    f"*(z=**{(actual_quality - expected_quality) / scores.std():.1f}**)*",
+                    f"*(z=**{z_score:.2f}**)*",
             ephemeral=True
         )
 
