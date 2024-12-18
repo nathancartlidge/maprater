@@ -148,14 +148,18 @@ class BaseCommands(commands.Cog):
                 )
 
     @slash_command(description="Get a summary of your play today")
-    async def today(self, ctx: ApplicationContext):
-        """Prints the last `n` pieces of data to discord, with option to delete"""
+    async def today(self, ctx: ApplicationContext,
+                    user: Option(discord.Member, description="Get someone else's stats", required=False, default=None)):
+        """Get the last few samples for this user to discord, with option to delete"""
         logging.info("Getting session - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")
             return
 
-        ids, lines = await self.db_handler.get_last(ctx.guild_id, 25, ctx.user.name)
+        if user is None:
+            user = ctx.user
+
+        ids, lines = await self.db_handler.get_last(ctx.guild_id, 25, user.name)
         min_time = datetime.now(tz=ZoneInfo("localtime")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
         lines = [l for l in lines if l[3] >= min_time]
 
@@ -210,21 +214,21 @@ class BaseCommands(commands.Cog):
 
         if z_score < -2:
             opinion = "**hates**"
-        elif -2 <= -z_score < -1:
+        elif z_score < -1:
             opinion = "_might_ dislike"
-        elif -1 <= z_score < 1:
-            opinion = "is neutral about"
-        elif 1 <= z_score < 2:
+        elif z_score < 1:
+            opinion = "is _probably_ neutral about"
+        elif z_score < 2:
             opinion = "_might_ like"
         else:
             opinion = "**loves**"
 
         await ctx.respond(
-            content=f"The Overwatch team {opinion} Reinhardt! (p={100 * (1 - NormalDist().cdf(abs(z_score))):.2f}%)"
+            content=f"The Overwatch team {opinion} Reinhardt! (p={2 * (1 - NormalDist().cdf(abs(z_score))):.2f})"
                     f"\n-# (assuming a uniform distribution for map selection as the baseline)"
                     f"\n> Expected Quality: **{expected_quality:.2f}** *(n={data.shape[0]}, σ={scores.std():.3f})*"
-                    f"\n> Actual Quality: **{actual_quality:.2f}** "
-                    f"*(z=**{z_score:.2f}**)*",
+                    f"\n> Actual Quality: **{actual_quality:.2f}**"
+                    f"\n> Z-score: **{z_score:.2f}**",
             ephemeral=True
         )
 
