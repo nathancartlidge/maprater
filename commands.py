@@ -12,7 +12,7 @@ from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from constants import FIRE_RANKINGS, LATEST_SEASON, MAP_TYPES, MAPS, MapType, Seasons
+from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAP_TYPES, MAPS, MapType, Seasons
 from embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
 from db_handler import DatabaseHandler
 
@@ -170,7 +170,7 @@ class BaseCommands(commands.Cog):
             wins = sum([r == "win" for (_, _, r, _) in lines])
             losses = sum([r == "loss" for (_, _, r, _) in lines])
             games = len(lines)
-            emoji = '🥳' if wins > losses else '🥲'
+            emoji = '🥰' if wins - losses > 5 else '🥳' if wins > losses else '🥲' if losses - wins < 2 else '😭'
             games_summary[0] = f"### Today: {emoji}\n-# Net Wins: **{wins - losses:+}** / Winrate: **{100 * wins / games:.0f}%** (played **{games}**, won **{wins}**)"
 
             await ctx.respond(
@@ -181,7 +181,7 @@ class BaseCommands(commands.Cog):
     @slash_command(description="How does your map pick-rate compare to Rein maps?")
     async def anti_rein(self, ctx: ApplicationContext,
                         user: Option(discord.Member, description="Limit to a particular person", default=None),
-                        season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+                        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
         """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.info("Getting anti-rein - Invoked by %s", ctx.author)
         await ctx.defer(ephemeral=True)

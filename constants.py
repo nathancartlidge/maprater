@@ -42,7 +42,7 @@ class Seasons(Enum):
     All = None
 
 
-LATEST_SEASON = Seasons.Fourteen
+DEFAULT_SEASON = Seasons.All
 
 FIRE_RANKINGS = {
     "Antarctic": "Good",

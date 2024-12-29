@@ -15,7 +15,7 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 from matplotlib.ticker import MaxNLocator
 
-from constants import FIRE_RANKINGS, LATEST_SEASON, MAPS_LIST, OW2_MAPS, Seasons
+from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, Seasons
 from db_handler import DatabaseHandler
 
 mpl.use("agg")  # force non-interactive backend
@@ -49,7 +49,7 @@ class PlotCommands(commands.Cog):
     async def winrate(self, ctx: ApplicationContext,
                       user: Option(discord.Member, description="Limit data to a particular person", required=True),
                       window_size: Option(int, description="Window size", default=20, min_value=1, max_value=100),
-                      season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+                      season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
@@ -100,8 +100,8 @@ class PlotCommands(commands.Cog):
     @slash_command(description="Per-Map Winrate")
     async def map_winrate(self, ctx: ApplicationContext,
                           user: Option(discord.Member, description="Limit data to a particular person", default=None),
-                          rein_colours: Option(bool, description="Colour by map quality for Reinhardt", default=None),
-                          season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+                          rein_colours: Option(bool, description="Colour by map quality for Reinhardt", default=False),
+                          season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
@@ -119,8 +119,8 @@ class PlotCommands(commands.Cog):
                              user: Option(discord.Member, description="Limit to a particular person", default=None),
                              win_loss: Option(bool, description="Cumulative wins and losses per-map", default=False),
                              rein_colours: Option(bool, description="Colour by map quality for Reinhardt",
-                                                  default=None),
-                             season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+                                                  default=False),
+                             season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
@@ -137,7 +137,7 @@ class PlotCommands(commands.Cog):
     async def relative_rank(self, ctx: ApplicationContext,
                             user: Option(discord.Member, description="Limit to a particular person"),
                             real_dates: Option(bool, description="Use real dates", default=False),
-                            season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+                            season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 
@@ -197,7 +197,7 @@ class PlotCommands(commands.Cog):
     async def streak(self, ctx: ApplicationContext,
                      user: Option(discord.Member, description="Limit to a particular person"),
                      keep_aspect: Option(bool, description="Maintain aspect ratio in plot", default=True),
-                     season: Option(Seasons, description="Overwatch Season", default=LATEST_SEASON)):
+                     season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
         # support both forms of ctx
         await ctx.defer(ephemeral=True)
 

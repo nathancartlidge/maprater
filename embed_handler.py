@@ -8,7 +8,7 @@ from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
-from constants import LATEST_SEASON, MAPS, MapType
+from constants import DEFAULT_SEASON, MAPS, MapType
 from plotting import PlotCommands
 
 
@@ -123,7 +123,8 @@ class PlotButtons(discord.ui.View):
             self=self.plot_commands,
             ctx=FakeContext(interaction),
             user=interaction.user,
-            season=LATEST_SEASON
+            rein_colours=False,
+            season=DEFAULT_SEASON
         )
 
     @discord.ui.button(label="Per-Map Play Count", custom_id="pmpc", style=ButtonStyle.blurple)
@@ -133,7 +134,8 @@ class PlotButtons(discord.ui.View):
             ctx=FakeContext(interaction),
             user=interaction.user,
             win_loss=False,
-            season=LATEST_SEASON
+            rein_colours=False,
+            season=DEFAULT_SEASON
         )
 
     @discord.ui.button(label="Rolling Winrate", custom_id="rw", style=ButtonStyle.green)
@@ -143,7 +145,7 @@ class PlotButtons(discord.ui.View):
             ctx=FakeContext(interaction),
             user=interaction.user,
             window_size=20,
-            season=LATEST_SEASON
+            season=DEFAULT_SEASON
         )
 
     @discord.ui.button(label="Relative Rank", custom_id="rr", style=ButtonStyle.green)
@@ -153,7 +155,7 @@ class PlotButtons(discord.ui.View):
             ctx=FakeContext(interaction),
             user=interaction.user,
             real_dates=False,
-            season=LATEST_SEASON
+            season=DEFAULT_SEASON
         )
 
     @discord.ui.button(label="Streaks", custom_id="s", style=ButtonStyle.red)
@@ -163,7 +165,7 @@ class PlotButtons(discord.ui.View):
             ctx=FakeContext(interaction),
             user=interaction.user,
             keep_aspect=True,
-            season=LATEST_SEASON
+            season=DEFAULT_SEASON
         )
 
 
