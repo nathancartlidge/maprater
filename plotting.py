@@ -15,7 +15,7 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 from matplotlib.ticker import MaxNLocator
 
-from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, Seasons
+from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, Seasons, SEASONS
 from db_handler import DatabaseHandler
 
 mpl.use("agg")  # force non-interactive backend
@@ -154,6 +154,17 @@ class PlotCommands(commands.Cog):
         if real_dates:
             sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-mid', ax=ax, linewidth=2)
             ax.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+            # todo: show a line for each of the seasons?
+
+            if season is Seasons.All:
+                for season in Seasons:
+                    if season is Seasons.All:
+                        continue
+
+                    index = data[data["time"] < SEASONS[season.value]].shape
+                    if index:
+                        value = mdates.date2num(np.datetime64(SEASONS[season.value]))
+                        ax.axvline(value, color="white", linewidth=1, zorder=0)
         else:
             # add an extra point at t=-1 for clarity
             data = pd.concat([
@@ -166,6 +177,15 @@ class PlotCommands(commands.Cog):
             x_min, x_max = ax.get_xlim()
             ax.set_xlim(x_min, x_max - 0.5)
             ax.grid(axis="x", color="white", alpha=0.5)
+
+            if season is Seasons.All:
+                for season in Seasons:
+                    if season is Seasons.All:
+                        continue
+
+                    index = data[data["time"] < SEASONS[season.value]].shape[0]
+                    if index:
+                        ax.axvline(index + 0.5, color="white", linewidth=1, zorder=0)
 
         ax.axhline(0, color="white", linewidth=1, zorder=0, linestyle="dashed")
         ax.axhline(data["cumulative"].min(), color="tab:red", linewidth=1, zorder=0, linestyle="dashed", label="Min")
