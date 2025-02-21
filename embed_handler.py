@@ -8,7 +8,7 @@ from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
-from constants import DEFAULT_SEASON, MAPS, MapType
+from constants import DEFAULT_SEASON, MAPS, MapType, RESULTS_EMOJI
 from plotting import PlotCommands
 
 
@@ -29,7 +29,7 @@ class MapButtons(discord.ui.View):
         logging.info("map callback - %s by %s", map_name, interaction.user)
         _, past_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=20,
                                                          username=interaction.user.name, map_name=map_name)
-        past_results_emoji = [{"win": "🏆", "loss": "❌", "draw": "🤝"}[result] for _, _, result, _ in past_results]
+        past_results_emoji = [RESULTS_EMOJI[result] for _, _, result, _ in past_results]
         text = f"**{map_name}**\n-# Past Results: {''.join(past_results_emoji)}\n"
 
         await interaction.response.send_message(
@@ -78,6 +78,10 @@ class VotingButtons(discord.ui.View):
         self.map = voted_map
         self.db_handler = db_handler
 
+    # @discord.ui.button(label="wide win", style=ButtonStyle.green, row=0)
+    # async def _wide_win(self, _, interaction):
+    #     await self._submit(result="wide-win", interaction=interaction)
+
     @discord.ui.button(label="win", style=ButtonStyle.green, row=0)
     async def _win(self, _, interaction):
         await self._submit(result="win", interaction=interaction)
@@ -90,13 +94,17 @@ class VotingButtons(discord.ui.View):
     async def _loss(self, _, interaction):
         await self._submit(result="loss", interaction=interaction)
 
+    # @discord.ui.button(label="wide loss", style=ButtonStyle.green, row=0)
+    # async def _wide_loss(self, _, interaction):
+    #     await self._submit(result="wide-loss", interaction=interaction)
+
     async def _submit(self, result, interaction: Interaction):
         assert interaction.guild_id is not None
         logging.info("%s voted: %s on %s", interaction.user.name, result, self.map)
 
         await self.db_handler.write_line(server_id=interaction.guild_id, username=interaction.user.name, mapname=self.map, result=result, datetime=time.time())
         _, recent_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=5, username=interaction.user.name)
-        recent_results_emoji = [{"win": "🏆", "loss": "❌", "draw": "🤝"}[result] for _, _, result, _ in recent_results]
+        recent_results_emoji = [RESULTS_EMOJI[result] for _, _, result, _ in recent_results]
 
         await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**\n"
                                                         f"-# Recent Games: {''.join(recent_results_emoji)}", view=None)

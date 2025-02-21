@@ -15,7 +15,8 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 from matplotlib.ticker import MaxNLocator
 
-from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, Seasons, SEASONS
+from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, RESULTS_SCORES, RESULTS_SCORES_PRIME, Seasons, \
+    SEASONS
 from db_handler import DatabaseHandler
 
 mpl.use("agg")  # force non-interactive backend
@@ -67,7 +68,7 @@ class PlotCommands(commands.Cog):
     def get_winrate_figure(self, data, window_size):
         """rolling winrate history"""
         logging.info("calculating winrate")
-        winloss_score = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
+        winloss_score = data["winloss"].replace(RESULTS_SCORES_PRIME)
         winrate = 100 * winloss_score.rolling(window=window_size, min_periods=3, center=True).mean().dropna().to_numpy()
 
         # make the plot
@@ -144,7 +145,7 @@ class PlotCommands(commands.Cog):
         data = await self.get_pandas(ctx, user, season.value)
 
         # make the plot
-        data["winloss-net"] = data["winloss"].replace({"win": 1.0, "draw": 0.0, "loss": -1.0})
+        data["winloss-net"] = data["winloss"].replace(RESULTS_SCORES)
         data["cumulative"] = data["winloss-net"].cumsum()
 
         logging.info("making plot")
@@ -228,20 +229,20 @@ class PlotCommands(commands.Cog):
         streak_counter = 0
         data_x, data_y = [], []
         for _, row in data.iterrows():
-            if row.winloss == "win":
+            if row.winloss in ("wide-win", "win"):
                 if streak_counter > 0:
-                    streak_counter += 1
+                    streak_counter += RESULTS_SCORES[row.winloss]
                 else:
                     data_x.append(i)
                     data_y.append(0)
-                    streak_counter = 1
-            elif row.winloss == "loss":
+                    streak_counter = RESULTS_SCORES[row.winloss]
+            elif row.winloss == ("wide-loss", "loss"):
                 if streak_counter < 0:
-                    streak_counter -= 1
+                    streak_counter += RESULTS_SCORES[row.winloss]
                 else:
                     data_x.append(i)
                     data_y.append(0)
-                    streak_counter = -1
+                    streak_counter = RESULTS_SCORES[row.winloss]
             else:
                 data_x.append(i)
                 data_y.append(0)
@@ -290,8 +291,8 @@ class PlotCommands(commands.Cog):
     def get_map_winrate_figure(self, data, count_only: bool = False, win_loss: bool = False, rein_colours: bool = False):
         """per-map winrate plot"""
         logging.info("calculating winrate")
-        data["winloss-score"] = data["winloss"].replace({"win": 1.0, "draw": 0.5, "loss": 0.0})
-        data["winloss-net"] = data["winloss"].replace({"win": 1.0, "draw": 0.0, "loss": -1.0})
+        data["winloss-score"] = data["winloss"].replace(RESULTS_SCORES_PRIME)
+        data["winloss-net"] = data["winloss"].replace(RESULTS_SCORES_PRIME)
 
         if count_only:
             all_maps = pd.Series(index=MAPS_LIST, data=0)
@@ -342,227 +343,6 @@ class PlotCommands(commands.Cog):
         logging.info("making image")
         buffer = self._export_figure(fig)
         return buffer
-
-    # todo: write plotting functions for winstreak, global winrate, map winrate
-    # @slash_command(description="Plot the current data")
-    # async def plot(self, ctx: ApplicationContext,
-    #                mode: Option(str, description="What plotting mode should be used?",
-    #                             required=True,
-    #                             choices=["normalise", "winloss", "maptype",
-    #                                      "maptype_role", "role", "average",
-    #                                      "count", "distribution"]),
-    #                user: Option(discord.Member, description="Limit data to a particular person",
-    #                             required=False, default=None)):
-    #     """Creates a plot of the current rating set"""
-    #     logging.info("Creating Plot (%s/%s) - Invoked by %s", mode, user, ctx.author)
-    #     if ctx.guild_id is None:
-    #         await ctx.respond(":warning: This bot does not support DMs")
-    #         return
-    #
-    #     data = self.db_handler.get_pandas_data(ctx.guild_id)
-    #
-    #     if user is not None:
-    #         # filter data to the user specified
-    #         data = data[data.author == str(user)]
-    #     else:
-    #         if mode == "distribution":
-    #             mode = "distribution_all"
-    #
-    #
-    #     if (lines := data.shape[0]) < 1:
-    #         await ctx.respond(
-    #             content=":warning: No matching data found - Cannot create graphs",
-    #             ephemeral=True
-    #         )
-    #         return
-    #
-    #     await ctx.defer(ephemeral=True)
-    #
-    #     try:
-    #         aggregate = self._process_data(data, mode)
-    #         figure = self._plot_data(aggregate, mode)
-    #         buffer = self._export_figure(figure)
-    #     except:
-    #         await ctx.respond(
-    #             content=":warning: Error occured while making graph",
-    #             ephemeral=True
-    #         )
-    #         raise
-    #
-    #     await ctx.respond(
-    #         content=f"Results plot for {lines} entries\n*{PLOT_DESCRIPTION[mode]}*",
-    #         files=[discord.File(fp=buffer, filename="graph.png")],
-    #         ephemeral=True
-    #     )
-    #
-    #     del buffer, figure, aggregate
-    #
-    # def _process_data(self, data: pd.DataFrame, mode: Optional[str] = None,
-    #                   draw_is_loss: bool = False):
-    #     """Converts raw Dataframe to Pandas group-by format"""
-    #
-    #     data["winloss"] = data["winloss"].replace(
-    #         to_replace=["win", "draw", "loss"],
-    #         value=["Win", "Loss" if draw_is_loss else "Win", "Loss"]
-    #     )
-    #     data["role"] = data["role"].replace(to_replace=["t", "d", "s"],
-    #                                         value=["Tank", "Damage", "Support"])
-    #     data["map_type"] = [MAP_TYPES[map] for map in data["map"]]
-    #
-    #     if mode in ("distribution", "distribution_all"):
-    #         return data  # No processing needed - not split by map
-    #
-    #     if mode == "average":
-    #         grouped = data.groupby(["map"])["sentiment"]
-    #     elif mode == "maptype":
-    #         grouped = data.groupby(["map_type", "winloss"])["sentiment"]
-    #     elif mode == "maptype_role":
-    #         grouped = data.groupby(["map_type", "role"])["sentiment"]
-    #     elif mode == "role":
-    #         grouped = data.groupby(["map", "role"])["sentiment"]
-    #     else:
-    #         grouped = data.groupby(["map", "winloss"])["sentiment"]
-    #
-    #     if mode == "normalise" or mode is None:
-    #         agg = grouped.mean()
-    #         agg = agg.unstack()
-    #         agg = agg.mean(axis=1)
-    #     elif mode in ("winloss", "average", "maptype", "maptype_role", "role"):
-    #         agg = grouped.mean()
-    #     elif mode == "count":
-    #         agg = grouped.count()
-    #         agg = agg.fillna(0)
-    #     else:
-    #         raise ValueError("Incorrect mode")
-    #
-    #     agg = agg.sort_values()
-    #     agg = agg.reset_index()
-    #     return agg
-    #
-    # @staticmethod
-    # def _plot_data(agg, mode=None):
-    #     """Converts pandas groupby to matplolib plot image buffer"""
-    #     # The closest-matching theme for Discord (assuming dark mode)
-    #     mpl.style.use("dark_background")
-    #
-    #     if mode == "maptype":
-    #         fig, ax = plt.subplots(figsize=(8, 6))
-    #     else:
-    #         fig, ax = plt.subplots(figsize=(12, 6))
-    #
-    #     if mode == "normalise" or mode is None:
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map",
-    #             y=0,
-    #             ax=ax,
-    #             palette="flare_r"
-    #         )
-    #     elif mode == "winloss":
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map",
-    #             y="sentiment",
-    #             ax=ax,
-    #             hue="winloss",
-    #             palette=WINLOSS_PALETTE
-    #         )
-    #     elif mode == "average":
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map",
-    #             y="sentiment",
-    #             ax=ax,
-    #             palette="flare_r"
-    #         )
-    #     elif mode == "maptype":
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map_type",
-    #             y="sentiment",
-    #             ax=ax,
-    #             hue="winloss",
-    #             palette=WINLOSS_PALETTE
-    #         )
-    #     elif mode == "role":
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map",
-    #             y="sentiment",
-    #             ax=ax,
-    #             hue="role",
-    #             palette=ROLE_PALETTE
-    #         )
-    #     elif mode == "maptype_role":
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map_type",
-    #             y="sentiment",
-    #             ax=ax,
-    #             hue="role",
-    #             palette=ROLE_PALETTE
-    #         )
-    #     elif mode == "count":
-    #         sns.barplot(
-    #             data=agg,
-    #             x="map",
-    #             y="sentiment",
-    #             ax=ax,
-    #             hue="winloss",
-    #             palette=WINLOSS_PALETTE,
-    #         )
-    #         ax.set_ylabel("Count")
-    #     elif mode == "distribution":
-    #         sns.kdeplot(
-    #             data=agg,
-    #             x="sentiment",
-    #             ax=ax,
-    #             hue="winloss",
-    #             palette=WINLOSS_PALETTE,
-    #             fill=True,
-    #             bw_adjust=1.25
-    #         )
-    #     elif mode == "distribution_all":
-    #         sns.kdeplot(
-    #             data=agg,
-    #             x="sentiment",
-    #             ax=ax,
-    #             hue="author",
-    #             fill=True,
-    #             bw_adjust=1
-    #         )
-    #     else:
-    #         raise ValueError("Incorrect mode")
-    #
-    #     if mode in ("distribution", "distribution_all"):
-    #         ax.set_xlim(-1, 7)
-    #         ax.set_xlabel("Quality")
-    #     elif mode != "count":
-    #         ax.set_ylim(bottom=0, top=6)
-    #         ax.set_ylabel("Quality")
-    #
-    #     if mode in ("winloss", "maptype", "count", "distribution",
-    #                 "distribution_all", "role", "maptype_role"):
-    #         legend = ax.get_legend()
-    #         if legend is not None:
-    #             if mode == "distribution_all":
-    #                 legend.set_title("Author")
-    #             elif mode in ("role", "maptype_role"):
-    #                 legend.set_title("Role")
-    #             else:
-    #                 legend.set_title("Win / Loss")
-    #             legend.get_frame().set_alpha(0)
-    #
-    #     sns.despine(ax=ax)
-    #
-    #     if mode not in ("distribution", "distribution_all"):
-    #         ax.tick_params(axis='x', rotation=45)
-    #         if mode in ("maptype", "maptype_role"):
-    #             ax.set_xlabel("Map Type")
-    #         else:
-    #             ax.set_xlabel("Map")
-    #
-    #     return fig
 
     @staticmethod
     def _export_figure(fig):

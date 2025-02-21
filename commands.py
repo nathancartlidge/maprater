@@ -12,7 +12,7 @@ from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAP_TYPES, MAPS, MapType, Seasons
+from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAP_TYPES, MAPS, MapType, RESULTS_EMOJI, Seasons
 from embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
 from db_handler import DatabaseHandler
 
@@ -238,7 +238,7 @@ class BaseCommands(commands.Cog):
         if skip_username:
             output.append(f"Data for user `{lines[0][0]}`:")
         for (username, map_name, result, datetime) in lines:
-            result_string = {"win": "🏆", "loss": "❌", "draw": "🤝"}[result]
+            result_string = RESULTS_EMOJI[result]
 
             if skip_username:
                 output.append(f"{result_string} on *{map_name}* (<t:{datetime}:R>)")
