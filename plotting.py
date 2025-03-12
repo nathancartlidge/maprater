@@ -15,8 +15,8 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 from matplotlib.ticker import MaxNLocator
 
-from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, RESULTS_SCORES, RESULTS_SCORES_PRIME, Seasons, \
-    SEASONS
+from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAPS_LIST, OW2_MAPS, RESULTS_SCORES, RESULTS_SCORES_PRIME, \
+    RESULTS_SCORES_PRIME_0_1, Seasons, SEASONS
 from db_handler import DatabaseHandler
 
 mpl.use("agg")  # force non-interactive backend
@@ -68,7 +68,7 @@ class PlotCommands(commands.Cog):
     def get_winrate_figure(self, data, window_size):
         """rolling winrate history"""
         logging.info("calculating winrate")
-        winloss_score = data["winloss"].replace(RESULTS_SCORES_PRIME)
+        winloss_score = data["winloss"].replace(RESULTS_SCORES_PRIME_0_1)
         winrate = 100 * winloss_score.rolling(window=window_size, min_periods=3, center=True).mean().dropna().to_numpy()
 
         # make the plot
@@ -150,7 +150,7 @@ class PlotCommands(commands.Cog):
 
         logging.info("making plot")
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(12, 4))
+        fig, ax = plt.subplots(figsize=(18 if data.shape[0] > 50 else 12, 4))
 
         if real_dates:
             sns.lineplot(x=data["time"], y=data["cumulative"], drawstyle='steps-mid', ax=ax, linewidth=2)
@@ -158,20 +158,13 @@ class PlotCommands(commands.Cog):
             # todo: show a line for each of the seasons?
 
             if season is Seasons.All:
-                for season in Seasons:
-                    if season is Seasons.All:
-                        continue
-
-                    index = data[data["time"] < SEASONS[season.value]].shape
-                    if index:
-                        value = mdates.date2num(np.datetime64(SEASONS[season.value]))
-                        ax.axvline(value, color="white", linewidth=1, zorder=0)
+                self._add_season_lines(data, ax, real_dates=True)
         else:
             # add an extra point at t=-1 for clarity
             data = pd.concat([
                 pd.DataFrame(index=[-1], data={"cumulative": 0}),
                 data,
-                pd.DataFrame(index=[9999], data={"cumulative": data["cumulative"].iloc[-1]})
+                pd.DataFrame(index=[99999], data={"cumulative": data["cumulative"].iloc[-1]})
             ], ignore_index=True).reset_index(drop=True)
             sns.lineplot(x=data.index, y=data["cumulative"], drawstyle='steps-post', ax=ax, linewidth=2)
             ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -180,13 +173,7 @@ class PlotCommands(commands.Cog):
             ax.grid(axis="x", color="white", alpha=0.5)
 
             if season is Seasons.All:
-                for season in Seasons:
-                    if season is Seasons.All:
-                        continue
-
-                    index = data[data["time"] < SEASONS[season.value]].shape[0]
-                    if index:
-                        ax.axvline(index + 0.5, color="white", linewidth=1, zorder=0)
+                self._add_season_lines(data, ax)
 
         ax.axhline(0, color="white", linewidth=1, zorder=0, linestyle="dashed")
         ax.axhline(data["cumulative"].min(), color="tab:red", linewidth=1, zorder=0, linestyle="dashed", label="Min")
@@ -236,7 +223,7 @@ class PlotCommands(commands.Cog):
                     data_x.append(i)
                     data_y.append(0)
                     streak_counter = RESULTS_SCORES[row.winloss]
-            elif row.winloss == ("wide-loss", "loss"):
+            elif row.winloss in ("wide-loss", "loss"):
                 if streak_counter < 0:
                     streak_counter += RESULTS_SCORES[row.winloss]
                 else:
@@ -259,7 +246,10 @@ class PlotCommands(commands.Cog):
 
         logging.info("making plot")
         plt.style.use('dark_background')
-        fig, ax = plt.subplots(figsize=(12, 4))
+        fig, ax = plt.subplots(figsize=(18 if data.shape[0] > 50 else 12, 4))
+
+        if season is Seasons.All:
+            self._add_season_lines(data, ax)
 
         ax.plot(data_x, data_y, color="white")
         ax.fill_between(data_x, data_y, 0, where=data_y >= 0, color="tab:green", alpha=0.3)
@@ -270,7 +260,8 @@ class PlotCommands(commands.Cog):
 
         ax.set_ylabel("Streak")
 
-        ax.autoscale(enable=True, axis='x', tight=True)
+        # ax.autoscale(enable=True, axis='x', tight=True)
+        ax.set_xlim(-1, i + 1)
         y_min, y_max = ax.get_ylim()
         y_abs = max(abs(y_min), abs(y_max))
         ax.set_ylim(-y_abs, y_abs)
@@ -291,7 +282,7 @@ class PlotCommands(commands.Cog):
     def get_map_winrate_figure(self, data, count_only: bool = False, win_loss: bool = False, rein_colours: bool = False):
         """per-map winrate plot"""
         logging.info("calculating winrate")
-        data["winloss-score"] = data["winloss"].replace(RESULTS_SCORES_PRIME)
+        data["winloss-score"] = data["winloss"].replace(RESULTS_SCORES_PRIME_0_1)
         data["winloss-net"] = data["winloss"].replace(RESULTS_SCORES_PRIME)
 
         if count_only:
@@ -343,6 +334,21 @@ class PlotCommands(commands.Cog):
         logging.info("making image")
         buffer = self._export_figure(fig)
         return buffer
+
+    @staticmethod
+    def _add_season_lines(data: pd.DataFrame, ax: plt.Axes, real_dates: bool = False):
+        for season in Seasons:
+            if season is Seasons.All:
+                continue
+
+            else:
+                index = data[data["time"] < SEASONS[season.value]].shape[0]
+                if index:
+                    if real_dates:
+                        value = mdates.date2num(np.datetime64(SEASONS[season.value]))
+                        ax.axvline(value, color="white", linewidth=1, zorder=0)
+                    else:
+                        ax.axvline(index + 0.5, color="white", linewidth=1, zorder=0)
 
     @staticmethod
     def _export_figure(fig):

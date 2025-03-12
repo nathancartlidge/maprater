@@ -23,7 +23,9 @@ MAP_TYPES = [key.name.title() for key in MAPS]
 WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
 RESULTS_EMOJI = {"wide-win": "🏆*", "win": "🏆", "loss": "❌", "wide-loss": "❌*", "draw": "🤝"}
 RESULTS_SCORES = {"wide-win": 0.5, "win": 1, "loss": -1, "wide-loss": -0.5, "draw": 0}
+RESULTS_SCORE_0_1 = {"wide-win": 0.75, "win": 1, "loss": 0, "wide-loss": 0.25, "draw": 0.5}
 RESULTS_SCORES_PRIME = {"wide-win": 1, "win": 1, "loss": -1, "wide-loss": -1, "draw": 0}
+RESULTS_SCORES_PRIME_0_1 = {"wide-win": 1, "win": 1, "loss": 0, "wide-loss": 0, "draw": 0.5}
 ROLE_PALETTE = {"Tank": "tab:orange", "Damage": "tab:blue", "Support": "tab:green"}
 
 OW2_MAPS = ["Queen St", "Circuit", "Colosseo", "Midtown", "Paraiso",

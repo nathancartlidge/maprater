@@ -158,7 +158,6 @@ class DatabaseHandler:
         reads the csv file into a Pandas df
         note that this function is *not* async
         """
-
         logging.info("Getting data as Pandas")
 
         with sqlite3.connect(self.get_db_name(server_id)) as conn:
