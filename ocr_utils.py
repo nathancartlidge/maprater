@@ -1,16 +1,23 @@
+import logging
 from pathlib import Path
 
 import cv2
+import requests
 import numpy as np
 import matplotlib.pyplot as plt
 
+import discord
+from discord import ApplicationContext
+from discord.commands import Option, slash_command
+from discord.ext import commands
+
 # manually calculated with some trial and error
 COLS = [0.38, 0.45, 0.52, 0.595, 0.74, 0.865, 0.985]
-COL_KEYS = ["K", "A", "D", "Damage", "Healing", "Mitigated"]
+COL_KEYS = ["K", "A", "D", "Damage", "Healing", "Mit."]
 ROWS = [0.02, 0.2, 0.4, 0.6, 0.8, 0.98]
 
 
-def detect_team_boxes(image_path):
+def detect_team_boxes(image: Path | str | np.ndarray):
     """
     Detects bounding boxes for blue and red team sections in the scoreboard image.
 
@@ -20,17 +27,20 @@ def detect_team_boxes(image_path):
     Returns:
         dict: Dictionary containing bounding boxes for 'blue' and 'red' teams, or None if detection fails.
     """
-    img = cv2.imread(image_path)
-    if img is None:
-        print(f"Error: Could not read image at {image_path}")
-        return None
+    if isinstance(image, (str, Path)):
+        img = cv2.imread(image)
+        if img is None:
+            print(f"Error: Could not read image at {image}")
+            return None
+    else:
+        img = image
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
     # --- Define HSV color ranges for blue and red ---
     # Adjust these ranges if needed based on your images
-    lower_blue = np.array([90, 240, 120])   # Example blue range
-    upper_blue = np.array([100, 255, 190])
+    lower_blue = np.array([90, 235, 120])   # Example blue range
+    upper_blue = np.array([105, 255, 195])
     lower_red = np.array([160, 200, 110])    # Example red range (adjust hue for reds if needed, may need to split range)
     upper_red = np.array([180, 220, 140])
 
@@ -63,10 +73,16 @@ def detect_team_boxes(image_path):
         return None
 
 
-def split_teams(image_path):
-    image = cv2.imread(image_path)
+def split_teams(image_path: Path | str | np.ndarray):
+    if isinstance(image_path, (str, Path)):
+        image = cv2.imread(image_path)
+        if image is None:
+            print(f"Error: Could not read image at {image_path}")
+            return None
+    else:
+        image = image_path
 
-    team_boxes = detect_team_boxes(image_path)
+    team_boxes = detect_team_boxes(image)
     blue_box = team_boxes['blue']
     red_box = team_boxes['red']
 
@@ -142,6 +158,8 @@ def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: 
 
     # Try each template
     for digit, digit_templates in templates.items():
+        score = 0
+        count = 0
         for template in digit_templates:
             if np.sum(template) == 0:
                 continue
@@ -152,7 +170,8 @@ def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: 
 
             # Match the template
             result = cv2.matchTemplate(digit_image, template, cv2.TM_CCORR_NORMED)
-            score = np.max(result)
+            score += np.max(result)
+            count += 1
 
             if plot:
                 plt.imshow(digit_image)
@@ -160,12 +179,15 @@ def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: 
                 plt.imshow(template)
                 plt.show()
 
-            if show_scores:
-               print(digit, score)
+        # get average not maximum score
+        score /= count
 
-            if score > best_score:
-                best_score = score
-                best_digit = digit
+        if show_scores:
+           print(digit, score)
+
+        if score > best_score:
+            best_score = score
+            best_digit = digit
 
     # Return the digit if score is above threshold
     if best_score >= threshold:
@@ -207,3 +229,129 @@ def print_scoreboards(blue_team, red_team):
                 print(f"{''.join(value): >10}", end=" ")
             print()
         print()
+
+
+class OcrCog(commands.Cog):
+    def __init__(self, base):
+        self.templates = load_templates(base / "templates.npy")
+
+    @staticmethod
+    def download_file(url):
+        logging.info("downloading image from %s", url)
+
+        req = requests.get(url)
+        if req.status_code != 200:
+            return None
+
+        buf = np.asarray(bytearray(req.content), dtype=np.uint8)
+        img = cv2.imdecode(buf, -1)  # 'Load it as it is'
+        return img
+
+    @staticmethod
+    def scoreboards(blue_scoreboard, red_scoreboard):
+        data = ""
+        for key in COL_KEYS:
+            if key in ["K", "A", "D"]:
+                data += f"{''.join(key): <3} "
+            else:
+                data += f"{''.join(key): <7} "
+
+        data += "\n"
+
+        for scoreboard in [blue_scoreboard, red_scoreboard]:
+            for player in scoreboard:
+                for key, value in player.items():
+                    if key in ["K", "A", "D"]:
+                        data += f"{''.join(value): <3} "
+                    else:
+                        data += f"{''.join(value): <7} "
+                data += "\n"
+            data += "\n"
+
+        return data
+
+    @staticmethod
+    def stats(blue_scoreboard, red_scoreboard):
+        try:
+            stats = ""
+            for team_name, scoreboard, enemy_scoreboard in zip(["blue", "red"], [blue_scoreboard, red_scoreboard],
+                                                               [red_scoreboard, blue_scoreboard]):
+                deaths = sum(int(p["D"]) for p in scoreboard)
+                enemy_d = sum(int(p["D"]) for p in enemy_scoreboard)
+                damage = sum(int(p["Damage"]) for p in scoreboard) / 1000
+                heal = sum(int(p["Healing"]) for p in scoreboard) / 1000
+                mit = sum(int(p["Mit."]) for p in scoreboard) / 1000
+                enemy_dmg = sum(int(p["Damage"]) for p in enemy_scoreboard) / 1000
+
+                stats += f"**{team_name.title()} Team:** {enemy_d}-{deaths}\n" \
+                         f"\t{damage:.1f}k damage dealt ({damage / enemy_d:.1f}k per elim)\n" \
+                         f"\t{heal:.1f}k healed ({100 * heal / enemy_dmg:.0f}% of enemy damage)\n" \
+                         f"\t{mit:.1f}k mitigated ({100 * mit / enemy_dmg:.0f}% of enemy damage)\n\n"
+            return stats
+        except:
+            return None
+
+    @slash_command(description="use OCR to detect team stats")
+    async def scoreboard(self, ctx: ApplicationContext,
+                         file: Option(discord.Attachment, description="The scoreboard to OCR", required=True),
+                         show_scoreboard: Option(bool, description="show the parsed scoreboard", required=False, default=False)):
+        """Read a scoreboard using OCR, show some basic stats"""
+        logging.info("OCR - Invoked by %s", ctx.author)
+        if ctx.guild_id is None:
+            await ctx.respond(":warning: This bot does not support DMs")
+            return
+
+        assert isinstance(file, discord.Attachment)
+
+        if "image" not in file.content_type:
+            await ctx.respond(
+                content=":warning: Bad attachment type",
+                ephemeral=True
+            )
+            raise ValueError("Bad attachment")
+
+        await ctx.defer(ephemeral=True)
+
+        img = self.download_file(file.url)
+        if img is None:
+            await ctx.respond(
+                content=":warning: Unable to download attachment",
+                ephemeral=True
+            )
+            raise IOError("Unable to download attachment")
+
+        logging.info("parsing the image...")
+
+        try:
+            blue_team, red_team = split_teams(img)
+            blue_scoreboard = read_scoreboard(blue_team, self.templates)
+            red_scoreboard = read_scoreboard(red_team, self.templates)
+        except:
+            await ctx.respond(
+                content=":warning: Unable to parse image",
+                ephemeral=True
+            )
+
+        logging.info("calculating stats...")
+
+        data = self.scoreboards(blue_scoreboard, red_scoreboard)
+        stats = self.stats(blue_scoreboard, red_scoreboard)
+
+        if stats is not None:
+            disclaimer = "-# these numbers have been made up by a computer and as such could be wrong! " \
+                         "(also stats are kinda meaningless so don't over-index on them)"
+            if show_scoreboard:
+                await ctx.respond(
+                    content=stats[:-2] + f"\n```{data}```\n{disclaimer}",
+                    ephemeral=True
+                )
+            else:
+                await ctx.respond(
+                    content=stats[:-2] + "\n\n" + disclaimer,
+                    ephemeral=True
+                )
+        else:
+            await ctx.respond(
+                content=f":warning: Failed to compute stats from data:\n```\n{data}```",
+                ephemeral=True
+            )

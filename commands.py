@@ -1,5 +1,4 @@
 """Implements basic bot commands"""
-import time
 from datetime import datetime
 from io import BytesIO
 import logging

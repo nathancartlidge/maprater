@@ -3,17 +3,18 @@
 import os
 import logging
 import argparse
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 from bot import MapRater
 from commands import BaseCommands
+from ocr_utils import OcrCog
 from plotting import PlotCommands
 from rank_update import UpdateCommand
 from db_handler import DatabaseHandler
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action="store_true", default=False)
     parser.add_argument("-v", "--verbose", action="store_true", default=False)
@@ -26,8 +27,10 @@ if __name__ == "__main__":
         logging.basicConfig(level=logging.INFO)
 
     if args.debug:
+        data_loc = Path("../maprater-data/")
         db_handler = DatabaseHandler(root_dir="../maprater-data/")
     else:
+        data_loc = Path("/data/")
         db_handler = DatabaseHandler(root_dir="/data/")
 
     # Load a discord API key from a .env file
@@ -41,11 +44,15 @@ if __name__ == "__main__":
         TOKEN = os.getenv("DISCORD_TOKEN")
         GUILD = os.getenv("DISCORD_GUILD", None)
 
-    if args.all_servers:
+    if args.all_servers and not args.debug:
+        logging.warning("starting in single-guild mode - commands may not update on other servers")
         bot = MapRater(db_handler=db_handler, debug_guilds=[GUILD])
 
     else:
-        bot = MapRater(db_handler=db_handler)
+        logging.warning("starting in single-guild mode - commands may not update on other servers")
+        bot = MapRater(db_handler=db_handler, debug_guilds=[GUILD])
+
+    logging.info(":)")
 
     if args.debug:
         @bot.slash_command()
@@ -56,5 +63,6 @@ if __name__ == "__main__":
     bot.add_cog(BaseCommands(bot.db_handler))
     bot.add_cog(PlotCommands(bot.db_handler))
     bot.add_cog(UpdateCommand(bot.db_handler))
+    bot.add_cog(OcrCog(data_loc))
 
     bot.run(TOKEN)
