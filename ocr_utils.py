@@ -13,7 +13,7 @@ from discord.ext import commands
 
 # manually calculated with some trial and error
 COLS = [0.38, 0.45, 0.52, 0.595, 0.74, 0.865, 0.985]
-COL_KEYS = ["K", "A", "D", "Damage", "Healing", "Mit."]
+COL_KEYS = ["K", "A", "D", "Damage", "Heal.", "Mit."]
 ROWS = [0.02, 0.2, 0.4, 0.6, 0.8, 0.98]
 
 
@@ -252,9 +252,9 @@ class OcrCog(commands.Cog):
         data = ""
         for key in COL_KEYS:
             if key in ["K", "A", "D"]:
-                data += f"{''.join(key): <3} "
+                data += f"{key: >3}"
             else:
-                data += f"{''.join(key): <7} "
+                data += f" {key: >6}"
 
         data += "\n"
 
@@ -262,9 +262,9 @@ class OcrCog(commands.Cog):
             for player in scoreboard:
                 for key, value in player.items():
                     if key in ["K", "A", "D"]:
-                        data += f"{''.join(value): <3} "
+                        data += f"{value: >3}"
                     else:
-                        data += f"{''.join(value): <7} "
+                        data += f" {value: >6}"
                 data += "\n"
             data += "\n"
 
@@ -276,19 +276,22 @@ class OcrCog(commands.Cog):
             stats = ""
             for team_name, scoreboard, enemy_scoreboard in zip(["blue", "red"], [blue_scoreboard, red_scoreboard],
                                                                [red_scoreboard, blue_scoreboard]):
-                deaths = sum(int(p["D"]) for p in scoreboard)
-                enemy_d = sum(int(p["D"]) for p in enemy_scoreboard)
-                damage = sum(int(p["Damage"]) for p in scoreboard) / 1000
-                heal = sum(int(p["Healing"]) for p in scoreboard) / 1000
-                mit = sum(int(p["Mit."]) for p in scoreboard) / 1000
-                enemy_dmg = sum(int(p["Damage"]) for p in enemy_scoreboard) / 1000
+                d = sum(int(player["D"]) for player in scoreboard)
+                dmg = sum(int(player["Damage"]) for player in scoreboard) / 1000
+                heal = sum(int(player["Heal."]) for player in scoreboard) / 1000
+                mit = sum(int(player["Mit."]) for player in scoreboard) / 1000
 
-                stats += f"**{team_name.title()} Team:** {enemy_d}-{deaths}\n" \
-                         f"\t{damage:.1f}k damage dealt ({damage / enemy_d:.1f}k per elim)\n" \
-                         f"\t{heal:.1f}k healed ({100 * heal / enemy_dmg:.0f}% of enemy damage)\n" \
-                         f"\t{mit:.1f}k mitigated ({100 * mit / enemy_dmg:.0f}% of enemy damage)\n\n"
+                enemy_d = sum(int(player["D"]) for player in enemy_scoreboard)
+                enemy_dmg = sum(int(player["Damage"]) for player in enemy_scoreboard) / 1000
+                enemy_heal = sum(int(player["Heal."]) for player in enemy_scoreboard) / 1000
+
+                stats += f"**{team_name.title()} Team:** {enemy_d}-{d}\n" \
+                     f"\t{dmg:.1f}k damage dealt ({dmg / enemy_d:.1f}k per elim)\n" \
+                     f"\t{dmg - enemy_heal:.1f}k net damage dealt ({(dmg - enemy_heal) / enemy_d:.1f}k per elim)\n" \
+                     f"\t{heal:.1f}k healed ({100 * heal / enemy_dmg:.0f}% of enemy damage)\n" \
+                     f"\t{mit:.1f}k mitigated ({100 * mit / (enemy_dmg + mit):.0f}% of hits landed)\n\n"
             return stats
-        except:
+        except ValueError:
             return None
 
     @slash_command(description="use OCR to detect team stats")
@@ -331,6 +334,7 @@ class OcrCog(commands.Cog):
                 content=":warning: Unable to parse image",
                 ephemeral=True
             )
+            return
 
         logging.info("calculating stats...")
 
@@ -342,7 +346,7 @@ class OcrCog(commands.Cog):
                          "(also stats are kinda meaningless so don't over-index on them)"
             if show_scoreboard:
                 await ctx.respond(
-                    content=stats[:-2] + f"\n```{data}```\n{disclaimer}",
+                    content=stats[:-2] + f"\n\n```{data}```\n{disclaimer}",
                     ephemeral=True
                 )
             else:
@@ -352,6 +356,7 @@ class OcrCog(commands.Cog):
                 )
         else:
             await ctx.respond(
-                content=f":warning: Failed to compute stats from data:\n```\n{data}```",
+                content=f":warning: Failed to compute stats from data: unfortunately, this bot does not yet support "
+                        f"in-match screenshots or weird colours\n\nBest attempt:```\n{data}```",
                 ephemeral=True
             )
