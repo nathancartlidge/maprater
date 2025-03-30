@@ -1,0 +1,6 @@
+venv
+data
+test
+.vscode
+.venv
+.ipynb_checkpoints
