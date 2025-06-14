@@ -1,14 +1,16 @@
 """Provides views - primarily for map voting"""
+from datetime import datetime
 import itertools
 import time
 import logging
+from zoneinfo import ZoneInfo
 
 import discord
 from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from db_handler import DatabaseHandler
-from constants import DEFAULT_SEASON, MAPS, MapType, RESULTS_EMOJI
+from constants import DEFAULT_SEASON, MAPS, RESULTS_SCORES, MapType, RESULTS_EMOJI
 from plotting import PlotCommands
 
 
@@ -103,11 +105,16 @@ class VotingButtons(discord.ui.View):
         logging.info("%s voted: %s on %s", interaction.user.name, result, self.map)
 
         await self.db_handler.write_line(server_id=interaction.guild_id, username=interaction.user.name, mapname=self.map, result=result, datetime=time.time())
-        _, recent_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=5, username=interaction.user.name)
+
+        _, results = await self.db_handler.get_last(interaction.guild_id, 25, interaction.user.name)
+        min_time = datetime.now(tz=ZoneInfo("localtime")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        recent_results = [l for l in results if l[3] >= min_time]
+        
         recent_results_emoji = [RESULTS_EMOJI[result] for _, _, result, _ in recent_results]
+        net_result = sum(RESULTS_SCORES[result] for _, _, result, _ in recent_results)
 
         await interaction.response.edit_message(content=f"**{result.title()}** on **{self.map}**\n"
-                                                        f"-# Recent Games: {''.join(recent_results_emoji)}", view=None)
+                                                        f"-# Today: `{net_result:+}` {''.join(recent_results_emoji)}", view=None)
 
 
 class FakeContext:
