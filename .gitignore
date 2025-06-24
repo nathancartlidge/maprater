@@ -1,7 +1,11 @@
 .env
 *.csv
 *.db
+*.ipynb
+
 .vscode
 .idea
+
 venv/
 __pycache__/
+.ipynb_checkpoints/

@@ -274,16 +274,16 @@ class OcrCog(commands.Cog):
     def stats(blue_scoreboard, red_scoreboard):
         try:
             stats = ""
-            for team_name, scoreboard, enemy_scoreboard in zip(["blue", "red"], [blue_scoreboard, red_scoreboard],
-                                                               [red_scoreboard, blue_scoreboard]):
-                d = sum(int(player["D"]) for player in scoreboard)
-                dmg = sum(int(player["Damage"]) for player in scoreboard) / 1000
-                heal = sum(int(player["Heal."]) for player in scoreboard) / 1000
-                mit = sum(int(player["Mit."]) for player in scoreboard) / 1000
+            for team_name, team, enemy_team in zip(["blue", "red"], [blue_scoreboard, red_scoreboard],
+                                                   [red_scoreboard, blue_scoreboard]):
+                d = sum(int(player["D"]) for player in team)
+                dmg = sum(int(player["Damage"]) for player in team) / 1000
+                heal = sum(int(player["Heal."]) for player in team) / 1000
+                mit = sum(int(player["Mit."]) for player in team) / 1000
 
-                enemy_d = sum(int(player["D"]) for player in enemy_scoreboard)
-                enemy_dmg = sum(int(player["Damage"]) for player in enemy_scoreboard) / 1000
-                enemy_heal = sum(int(player["Heal."]) for player in enemy_scoreboard) / 1000
+                enemy_d = sum(int(player["D"]) for player in enemy_team)
+                enemy_dmg = sum(int(player["Damage"]) for player in enemy_team) / 1000
+                enemy_heal = sum(int(player["Heal."]) for player in enemy_team) / 1000
 
                 stats += f"**{team_name.title()} Team:** {enemy_d}-{d}\n" \
                      f"\t{dmg:.1f}k damage dealt ({dmg / enemy_d:.1f}k per elim)\n" \

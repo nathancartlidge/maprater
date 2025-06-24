@@ -149,7 +149,7 @@ class BaseCommands(commands.Cog):
     @slash_command(description="Get a summary of your play today")
     async def today(self, ctx: ApplicationContext,
                     user: Option(discord.Member, description="Get someone else's stats", required=False, default=None)):
-        """Get the last few samples for this user to discord, with option to delete"""
+        """Get the last few samples for this user to discord, with an option to delete"""
         logging.info("Getting session - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
             await ctx.respond(":warning: This bot does not support DMs")

@@ -1,6 +1,7 @@
 """Database connectivity functions"""
 
 import logging
+from pathlib import Path
 from typing import Optional
 
 import sqlite3
@@ -17,6 +18,7 @@ class DatabaseHandler:
         self.tables = set()
 
     def get_db_name(self, server_id: int):
+        assert (Path(self.root_dir) / f"{server_id}-v2.db").resolve().exists()
         return f"{self.root_dir}{server_id}-v2.db"
 
     async def _get_user_id(self, server_id: int, username: str):
