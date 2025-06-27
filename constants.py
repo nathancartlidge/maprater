@@ -12,7 +12,7 @@ class MapType(Enum):
 MAPS = {
     MapType.CONTROL: ["Antarctic", "Busan", "Ilios", "Lijiang", "Nepal", "Oasis", "Samoa"],
     MapType.ESCORT: ["Circuit", "Dorado", "Havana", "Junkertown", "Rialto", "Route 66", "Shambali", "Gibraltar"],
-    MapType.FLASHPOINT: ["Junk City", "Suravasa"],
+    MapType.FLASHPOINT: ["Junk City", "Suravasa", "Aatlis"],
     MapType.HYBRID: ["Blizzard", "Eichenwalde", "Hollywood", "King's", "Midtown", "Numbani", "Paraiso"],
     MapType.PUSH: ["Colosseo", "Esperanca", "Queen St", "Runasapi"],
     MapType.CLASH: ["Hanaoka", "Anubis"]
