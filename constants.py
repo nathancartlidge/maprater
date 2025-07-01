@@ -21,7 +21,7 @@ MAPS_LIST = [map_name for map_set in MAPS.values() for map_name in map_set]
 MAP_TYPES = [key.name.title() for key in MAPS]
 
 WINLOSS_PALETTE = {"Win": "#4bc46d", "Loss": "#c9425d"}
-RESULTS_EMOJI = {"wide-win": "🏆*", "win": "🏆", "loss": "❌", "wide-loss": "❌*", "draw": "🤝"}
+RESULTS_EMOJI = {"wide-win": "✓", "win": "🏆", "loss": "❌", "wide-loss": "×", "draw": "🤝"}
 RESULTS_SCORES = {"wide-win": 0.5, "win": 1, "loss": -1, "wide-loss": -0.5, "draw": 0}
 RESULTS_SCORE_0_1 = {"wide-win": 0.75, "win": 1, "loss": 0, "wide-loss": 0.25, "draw": 0.5}
 RESULTS_SCORES_PRIME = {"wide-win": 1, "win": 1, "loss": -1, "wide-loss": -1, "draw": 0}
@@ -85,5 +85,6 @@ FIRE_RANKINGS = {
     "Queen St": "Bad",
     "Runasapi": "Good",
     "Hanaoka": "Good",
-    "Anubis": "Okay"
+    "Anubis": "Okay",
+    "Aatlis": "Okay"
 }

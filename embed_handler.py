@@ -29,10 +29,11 @@ class MapButtons(discord.ui.View):
 
     async def _callback(self, map_name, interaction: Interaction):
         logging.info("map callback - %s by %s", map_name, interaction.user)
-        _, past_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=20,
+        _, past_results = await self.db_handler.get_last(server_id=interaction.guild_id, count=100,
                                                          username=interaction.user.name, map_name=map_name)
-        past_results_emoji = [RESULTS_EMOJI[result] for _, _, result, _ in past_results]
-        text = f"**{map_name}**\n-# Past Results: {''.join(past_results_emoji)}\n"
+        winrate = (1 + sum("win" in l[2] for l in past_results)) / (len(past_results) + 2) * 100
+        past_results_emoji = [RESULTS_EMOJI[result] for _, _, result, _ in past_results[:20]]
+        text = f"**{map_name}**\n-# Normalised Winrate: `{winrate:.1f}%`\n-# Past Results: {''.join(past_results_emoji)}\n"
 
         await interaction.response.send_message(
             content=text,
@@ -80,9 +81,9 @@ class VotingButtons(discord.ui.View):
         self.map = voted_map
         self.db_handler = db_handler
 
-    # @discord.ui.button(label="wide win", style=ButtonStyle.green, row=0)
-    # async def _wide_win(self, _, interaction):
-    #     await self._submit(result="wide-win", interaction=interaction)
+    @discord.ui.button(label="wide win", style=ButtonStyle.green, row=0)
+    async def _wide_win(self, _, interaction):
+        await self._submit(result="wide-win", interaction=interaction)
 
     @discord.ui.button(label="win", style=ButtonStyle.green, row=0)
     async def _win(self, _, interaction):
@@ -96,9 +97,9 @@ class VotingButtons(discord.ui.View):
     async def _loss(self, _, interaction):
         await self._submit(result="loss", interaction=interaction)
 
-    # @discord.ui.button(label="wide loss", style=ButtonStyle.green, row=0)
-    # async def _wide_loss(self, _, interaction):
-    #     await self._submit(result="wide-loss", interaction=interaction)
+    @discord.ui.button(label="wide loss", style=ButtonStyle.red, row=0)
+    async def _wide_loss(self, _, interaction):
+        await self._submit(result="wide-loss", interaction=interaction)
 
     async def _submit(self, result, interaction: Interaction):
         assert interaction.guild_id is not None
