@@ -81,25 +81,25 @@ class VotingButtons(discord.ui.View):
         self.map = voted_map
         self.db_handler = db_handler
 
-    @discord.ui.button(label="wide win", style=ButtonStyle.green, row=0)
-    async def _wide_win(self, _, interaction):
-        await self._submit(result="wide-win", interaction=interaction)
-
     @discord.ui.button(label="win", style=ButtonStyle.green, row=0)
     async def _win(self, _, interaction):
         await self._submit(result="win", interaction=interaction)
+
+    @discord.ui.button(label="wide win", style=ButtonStyle.grey, row=0)
+    async def _wide_win(self, _, interaction):
+        await self._submit(result="wide-win", interaction=interaction)
 
     @discord.ui.button(label="draw", style=ButtonStyle.grey, row=0)
     async def _draw(self, _, interaction):
         await self._submit(result="draw", interaction=interaction)
 
+    @discord.ui.button(label="wide loss", style=ButtonStyle.grey, row=0)
+    async def _wide_loss(self, _, interaction):
+        await self._submit(result="wide-loss", interaction=interaction)
+
     @discord.ui.button(label="loss", style=ButtonStyle.red, row=0)
     async def _loss(self, _, interaction):
         await self._submit(result="loss", interaction=interaction)
-
-    @discord.ui.button(label="wide loss", style=ButtonStyle.red, row=0)
-    async def _wide_loss(self, _, interaction):
-        await self._submit(result="wide-loss", interaction=interaction)
 
     async def _submit(self, result, interaction: Interaction):
         assert interaction.guild_id is not None
