@@ -57,6 +57,8 @@ SELECT users.username as author, maps.map_name as map, ow2.result as winloss, da
     WHERE ow2.datetime >= unixepoch(?)
       AND ow2.datetime < unixepoch(?)
 """
+
+
 def SELECT_LAST_N(n: int):
     """Method to select `n` entries from the dataset"""
     return f"""
@@ -67,6 +69,8 @@ def SELECT_LAST_N(n: int):
             ORDER BY rating_id DESC
             LIMIT {min(100, max(1, int(n))):0d}
     """
+
+
 def SELECT_LAST_N_USERNAME(n: int):
     """Method to select `n` entries from the dataset, filtering by username"""
     return f"""
@@ -78,6 +82,8 @@ def SELECT_LAST_N_USERNAME(n: int):
             ORDER BY rating_id DESC
             LIMIT {min(100, max(1, int(n))):0d}
     """
+
+
 def SELECT_LAST_N_USERNAME_MAP(n: int):
     """Method to select `n` entries from the dataset, filtering by username"""
     return f"""
@@ -91,16 +97,19 @@ def SELECT_LAST_N_USERNAME_MAP(n: int):
             LIMIT {min(100, max(1, int(n))):0d}
     """
 
+
 SELECT_USERID_FROM_USERNAME = "SELECT user_id FROM users WHERE username = ?"
 SELECT_MAPID_FROM_MAPNAME = "SELECT map_id FROM maps WHERE map_name = ?"
+
 
 def DELETE_N_IDS(n: int):
     """Method to delete `n` ids from the dataset"""
     return f"""
         DELETE FROM ow2
             WHERE rating_id IN
-                ({', '.join(['?']*n)})
+                ({", ".join(["?"] * n)})
     """
+
 
 INSERT_INTO_DATA = """
 INSERT INTO ow2

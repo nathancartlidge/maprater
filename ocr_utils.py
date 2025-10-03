@@ -39,9 +39,11 @@ def detect_team_boxes(image: Path | str | np.ndarray):
 
     # --- Define HSV color ranges for blue and red ---
     # Adjust these ranges if needed based on your images
-    lower_blue = np.array([90, 235, 120])   # Example blue range
+    lower_blue = np.array([90, 235, 120])  # Example blue range
     upper_blue = np.array([105, 255, 195])
-    lower_red = np.array([160, 200, 110])    # Example red range (adjust hue for reds if needed, may need to split range)
+    lower_red = np.array(
+        [160, 200, 110]
+    )  # Example red range (adjust hue for reds if needed, may need to split range)
     upper_red = np.array([180, 220, 140])
 
     kernel = np.ones((5, 5), np.uint8)
@@ -61,12 +63,17 @@ def detect_team_boxes(image: Path | str | np.ndarray):
             # Find the largest contour - assuming it's the team box
             largest_contour = max(contours, key=cv2.contourArea)
             x, y, w, h = cv2.boundingRect(largest_contour)
-            team_bboxes[color] = (x, y, x + w, y + h) # Store as (x_start, y_start, x_end, y_end)
+            team_bboxes[color] = (
+                x,
+                y,
+                x + w,
+                y + h,
+            )  # Store as (x_start, y_start, x_end, y_end)
         else:
             print(f"Warning: No contours detected for {color} team.")
-            return None # Or handle no detection differently
+            return None  # Or handle no detection differently
 
-    if 'blue' in team_bboxes and 'red' in team_bboxes:
+    if "blue" in team_bboxes and "red" in team_bboxes:
         return team_bboxes
     else:
         print("Error: Could not detect both blue and red team boxes.")
@@ -83,11 +90,11 @@ def split_teams(image_path: Path | str | np.ndarray):
         image = image_path
 
     team_boxes = detect_team_boxes(image)
-    blue_box = team_boxes['blue']
-    red_box = team_boxes['red']
+    blue_box = team_boxes["blue"]
+    red_box = team_boxes["red"]
 
-    blue_team = image[blue_box[1]:blue_box[3], blue_box[0]:blue_box[2]]
-    red_team = image[red_box[1]:red_box[3], red_box[0]:red_box[2]]
+    blue_team = image[blue_box[1] : blue_box[3], blue_box[0] : blue_box[2]]
+    red_team = image[red_box[1] : red_box[3], red_box[0] : red_box[2]]
 
     blue_scale_factor = 1000 / blue_team.shape[1]
     red_scale_factor = 1000 / blue_team.shape[1]
@@ -95,12 +102,22 @@ def split_teams(image_path: Path | str | np.ndarray):
     if blue_team.shape[1] < 400 or red_team.shape[1] < 400:
         raise ValueError("bad size detected!")
 
-    blue_team = cv2.resize(blue_team,
-                           (int(blue_team.shape[1] * blue_scale_factor), int(blue_team.shape[0] * blue_scale_factor)),
-                           interpolation=cv2.INTER_LANCZOS4)
-    red_team = cv2.resize(red_team,
-                          (int(red_team.shape[1] * red_scale_factor), int(red_team.shape[0] * red_scale_factor)),
-                          interpolation=cv2.INTER_LANCZOS4)
+    blue_team = cv2.resize(
+        blue_team,
+        (
+            int(blue_team.shape[1] * blue_scale_factor),
+            int(blue_team.shape[0] * blue_scale_factor),
+        ),
+        interpolation=cv2.INTER_LANCZOS4,
+    )
+    red_team = cv2.resize(
+        red_team,
+        (
+            int(red_team.shape[1] * red_scale_factor),
+            int(red_team.shape[0] * red_scale_factor),
+        ),
+        interpolation=cv2.INTER_LANCZOS4,
+    )
 
     return blue_team, red_team
 
@@ -122,7 +139,7 @@ def split_digits(image, verbose: bool = False):
 
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
-        char_image = image[y:y+h, x:x+w]
+        char_image = image[y : y + h, x : x + w]
 
         # Determine if digit or comma by aspect ratio and area
         if h < 10:  # Likely a comma
@@ -135,14 +152,18 @@ def split_digits(image, verbose: bool = False):
         # place on a consistent background
         bg = np.zeros(shape=(20, 20), dtype=np.uint8)
         margin_h, margin_w = 20 - char_image.shape[0], 20 - char_image.shape[1]
-        bg[margin_h // 2:char_image.shape[0] + margin_h // 2, margin_w // 2:char_image.shape[1] + margin_w // 2] += char_image.astype(np.uint8)
+        bg[
+            margin_h // 2 : char_image.shape[0] + margin_h // 2,
+            margin_w // 2 : char_image.shape[1] + margin_w // 2,
+        ] += char_image.astype(np.uint8)
         result.append(bg)
 
     return result
 
 
-def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: bool = False,
-                                   show_scores: bool = False):
+def recognize_digit_with_templates(
+    digit_image, templates, threshold=0.7, plot: bool = False, show_scores: bool = False
+):
     """
     Recognize a single digit using template matching.
 
@@ -166,7 +187,9 @@ def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: 
 
             # Resize template to match digit image if needed
             if template.shape != digit_image.shape:
-                template = cv2.resize(template, (digit_image.shape[1], digit_image.shape[0]))
+                template = cv2.resize(
+                    template, (digit_image.shape[1], digit_image.shape[0])
+                )
 
             # Match the template
             result = cv2.matchTemplate(digit_image, template, cv2.TM_CCORR_NORMED)
@@ -183,7 +206,7 @@ def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: 
         score /= count
 
         if show_scores:
-           print(digit, score)
+            print(digit, score)
 
         if score > best_score:
             best_score = score
@@ -194,6 +217,7 @@ def recognize_digit_with_templates(digit_image, templates, threshold=0.7, plot: 
         return str(best_digit), best_score
     else:
         return "x", best_score
+
 
 def load_templates(path: Path | str):
     arr = np.load(path)
@@ -213,7 +237,12 @@ def read_scoreboard(team_image, templates):
 
             # todo: prevent it from going insane on edges
             thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_OTSU)[1]
-            player[key] = "".join([recognize_digit_with_templates(d, templates=templates)[0] for d in split_digits(thresh)])
+            player[key] = "".join(
+                [
+                    recognize_digit_with_templates(d, templates=templates)[0]
+                    for d in split_digits(thresh)
+                ]
+            )
         data.append(player)
     return data
 
@@ -274,8 +303,11 @@ class OcrCog(commands.Cog):
     def stats(blue_scoreboard, red_scoreboard):
         try:
             stats = ""
-            for team_name, team, enemy_team in zip(["blue", "red"], [blue_scoreboard, red_scoreboard],
-                                                   [red_scoreboard, blue_scoreboard]):
+            for team_name, team, enemy_team in zip(
+                ["blue", "red"],
+                [blue_scoreboard, red_scoreboard],
+                [red_scoreboard, blue_scoreboard],
+            ):
                 d = sum(int(player["D"]) for player in team)
                 dmg = sum(int(player["Damage"]) for player in team) / 1000
                 heal = sum(int(player["Heal."]) for player in team) / 1000
@@ -285,19 +317,31 @@ class OcrCog(commands.Cog):
                 enemy_dmg = sum(int(player["Damage"]) for player in enemy_team) / 1000
                 enemy_heal = sum(int(player["Heal."]) for player in enemy_team) / 1000
 
-                stats += f"**{team_name.title()} Team:** {enemy_d}-{d}\n" \
-                     f"\t{dmg:.1f}k damage dealt ({dmg / enemy_d:.1f}k per elim)\n" \
-                     f"\t{dmg - enemy_heal:.1f}k net damage dealt ({(dmg - enemy_heal) / enemy_d:.1f}k per elim)\n" \
-                     f"\t{heal:.1f}k healed ({100 * heal / enemy_dmg:.0f}% of enemy damage)\n" \
-                     f"\t{mit:.1f}k mitigated ({100 * mit / (enemy_dmg + mit):.0f}% of hits landed)\n\n"
+                stats += (
+                    f"**{team_name.title()} Team:** {enemy_d}-{d}\n"
+                    f"\t{dmg:.1f}k damage dealt ({dmg / enemy_d:.1f}k per elim)\n"
+                    f"\t{dmg - enemy_heal:.1f}k net damage dealt ({(dmg - enemy_heal) / enemy_d:.1f}k per elim)\n"
+                    f"\t{heal:.1f}k healed ({100 * heal / enemy_dmg:.0f}% of enemy damage)\n"
+                    f"\t{mit:.1f}k mitigated ({100 * mit / (enemy_dmg + mit):.0f}% of hits landed)\n\n"
+                )
             return stats
         except ValueError:
             return None
 
     @slash_command(description="use OCR to detect team stats")
-    async def scoreboard(self, ctx: ApplicationContext,
-                         file: Option(discord.Attachment, description="The scoreboard to OCR", required=True),
-                         show_scoreboard: Option(bool, description="show the parsed scoreboard", required=False, default=False)):
+    async def scoreboard(
+        self,
+        ctx: ApplicationContext,
+        file: Option(
+            discord.Attachment, description="The scoreboard to OCR", required=True
+        ),
+        show_scoreboard: Option(
+            bool,
+            description="show the parsed scoreboard",
+            required=False,
+            default=False,
+        ),
+    ):
         """Read a scoreboard using OCR, show some basic stats"""
         logging.info("OCR - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -307,10 +351,7 @@ class OcrCog(commands.Cog):
         assert isinstance(file, discord.Attachment)
 
         if "image" not in file.content_type:
-            await ctx.respond(
-                content=":warning: Bad attachment type",
-                ephemeral=True
-            )
+            await ctx.respond(content=":warning: Bad attachment type", ephemeral=True)
             raise ValueError("Bad attachment")
 
         await ctx.defer(ephemeral=True)
@@ -318,8 +359,7 @@ class OcrCog(commands.Cog):
         img = self.download_file(file.url)
         if img is None:
             await ctx.respond(
-                content=":warning: Unable to download attachment",
-                ephemeral=True
+                content=":warning: Unable to download attachment", ephemeral=True
             )
             raise IOError("Unable to download attachment")
 
@@ -330,10 +370,7 @@ class OcrCog(commands.Cog):
             blue_scoreboard = read_scoreboard(blue_team, self.templates)
             red_scoreboard = read_scoreboard(red_team, self.templates)
         except:
-            await ctx.respond(
-                content=":warning: Unable to parse image",
-                ephemeral=True
-            )
+            await ctx.respond(content=":warning: Unable to parse image", ephemeral=True)
             return
 
         logging.info("calculating stats...")
@@ -342,21 +379,22 @@ class OcrCog(commands.Cog):
         stats = self.stats(blue_scoreboard, red_scoreboard)
 
         if stats is not None:
-            disclaimer = "-# these numbers have been made up by a computer and as such could be wrong! " \
-                         "(also stats are kinda meaningless so don't over-index on them)"
+            disclaimer = (
+                "-# these numbers have been made up by a computer and as such could be wrong! "
+                "(also stats are kinda meaningless so don't over-index on them)"
+            )
             if show_scoreboard:
                 await ctx.respond(
                     content=stats[:-2] + f"\n\n```{data}```\n{disclaimer}",
-                    ephemeral=True
+                    ephemeral=True,
                 )
             else:
                 await ctx.respond(
-                    content=stats[:-2] + "\n\n" + disclaimer,
-                    ephemeral=True
+                    content=stats[:-2] + "\n\n" + disclaimer, ephemeral=True
                 )
         else:
             await ctx.respond(
                 content=f":warning: Failed to compute stats from data: unfortunately, this bot does not yet support "
-                        f"in-match screenshots or weird colours\n\nBest attempt:```\n{data}```",
-                ephemeral=True
+                f"in-match screenshots or weird colours\n\nBest attempt:```\n{data}```",
+                ephemeral=True,
             )

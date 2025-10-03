@@ -45,16 +45,21 @@ if __name__ == "__main__":
         GUILD = os.getenv("DISCORD_GUILD", None)
 
     if args.all_servers and not args.debug:
-        logging.warning("starting in single-guild mode - commands may not update on other servers")
+        logging.warning(
+            "starting in single-guild mode - commands may not update on other servers"
+        )
         bot = MapRater(db_handler=db_handler, debug_guilds=[GUILD])
 
     else:
-        logging.warning("starting in single-guild mode - commands may not update on other servers")
+        logging.warning(
+            "starting in single-guild mode - commands may not update on other servers"
+        )
         bot = MapRater(db_handler=db_handler, debug_guilds=[GUILD])
 
     logging.info(":)")
 
     if args.debug:
+
         @bot.slash_command()
         async def ping(ctx):
             """Show bot latency [debug]"""

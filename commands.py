@@ -1,4 +1,5 @@
 """Implements basic bot commands"""
+
 from datetime import datetime
 from io import BytesIO
 import logging
@@ -11,13 +12,22 @@ from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from constants import FIRE_RANKINGS, DEFAULT_SEASON, MAP_TYPES, MAPS, MapType, RESULTS_EMOJI, Seasons
+from constants import (
+    FIRE_RANKINGS,
+    DEFAULT_SEASON,
+    MAP_TYPES,
+    MAPS,
+    MapType,
+    RESULTS_EMOJI,
+    Seasons,
+)
 from embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
 from db_handler import DatabaseHandler
 
 
 class BaseCommands(commands.Cog):
     """Basic commands used for bot"""
+
     def __init__(self, db_handler: DatabaseHandler):
         self.db_handler = db_handler
 
@@ -35,12 +45,21 @@ class BaseCommands(commands.Cog):
         for map_types, cls in BUTTON_MAPS.items():
             await ctx.respond(content=f"### {map_types}", view=cls(self.db_handler))
 
-        await ctx.respond(content=f"### Plot Commands", view=PlotButtons(self.db_handler))
+        await ctx.respond(
+            content="### Plot Commands", view=PlotButtons(self.db_handler)
+        )
 
     @slash_command(description="Get raw data")
-    async def data(self, ctx: ApplicationContext,
-                   data_format: Option(str, description="Output Data Format",
-                                       required=True, choices=["sqlite", "csv"])):
+    async def data(
+        self,
+        ctx: ApplicationContext,
+        data_format: Option(
+            str,
+            description="Output Data Format",
+            required=True,
+            choices=["sqlite", "csv"],
+        ),
+    ):
         """Extracts raw data from the bot"""
         logging.info("Getting Raw Data - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -63,20 +82,33 @@ class BaseCommands(commands.Cog):
             buffer.seek(0)
             file = discord.File(fp=buffer, filename="data.csv")
 
-        await ctx.respond(
-            content=f"{lines} entries",
-            file=file,
-            ephemeral=True
-        )
+        await ctx.respond(content=f"{lines} entries", file=file, ephemeral=True)
 
     @slash_command(description="Get the last n rows of data")
     async def last(
-        self, ctx: ApplicationContext,
-        count: Option(int, description="Number of entries to return", min_value=1, default=1, max_value=100,
-                      required=True),
-        user: Option(discord.Member, description="Limit to a particular person", required=False, default=None),
-        map_type: Option(str, description="Limit to a particular map type", choices=MAP_TYPES, required=False,
-                         default=None)
+        self,
+        ctx: ApplicationContext,
+        count: Option(
+            int,
+            description="Number of entries to return",
+            min_value=1,
+            default=1,
+            max_value=100,
+            required=True,
+        ),
+        user: Option(
+            discord.Member,
+            description="Limit to a particular person",
+            required=False,
+            default=None,
+        ),
+        map_type: Option(
+            str,
+            description="Limit to a particular map type",
+            choices=MAP_TYPES,
+            required=False,
+            default=None,
+        ),
     ):
         """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.info("Getting last %s rows - Invoked by %s", count, ctx.author)
@@ -103,9 +135,11 @@ class BaseCommands(commands.Cog):
             await ctx.respond(content=":warning: No ratings found!", ephemeral=True)
         else:
             can_delete = False
-            if isinstance(ctx.user, discord.Member) \
-                and ctx.user.guild_permissions.manage_messages \
-                    and len(lines) <= 10:
+            if (
+                isinstance(ctx.user, discord.Member)
+                and ctx.user.guild_permissions.manage_messages
+                and len(lines) <= 10
+            ):
                 can_delete = True
 
             lines = self._format_lines(lines, skip_username=username is not None)
@@ -114,8 +148,7 @@ class BaseCommands(commands.Cog):
             if length >= 2000:
                 block = ""
                 index = 0
-                while index < len(lines) \
-                    and len(block + "\n" + lines[index]) < 2000:
+                while index < len(lines) and len(block + "\n" + lines[index]) < 2000:
                     block += "\n" + lines[index]
                     index += 1
 
@@ -123,8 +156,9 @@ class BaseCommands(commands.Cog):
 
                 while index < len(lines):
                     block = "*(continued)*\n"
-                    while index < len(lines) \
-                        and len(block + "\n" + lines[index]) < 2000:
+                    while (
+                        index < len(lines) and len(block + "\n" + lines[index]) < 2000
+                    ):
                         block += "\n" + lines[index]
                         index += 1
 
@@ -137,18 +171,23 @@ class BaseCommands(commands.Cog):
                 await ctx.respond(
                     content="\n".join(lines),
                     view=UndoLast(lines, ids, self.db_handler, can_delete),
-                    ephemeral=True
+                    ephemeral=True,
                 )
 
             else:
-                await ctx.respond(
-                    content="\n".join(lines),
-                    ephemeral=True
-                )
+                await ctx.respond(content="\n".join(lines), ephemeral=True)
 
     @slash_command(description="Get a summary of your play today")
-    async def today(self, ctx: ApplicationContext,
-                    user: Option(discord.Member, description="Get someone else's stats", required=False, default=None)):
+    async def today(
+        self,
+        ctx: ApplicationContext,
+        user: Option(
+            discord.Member,
+            description="Get someone else's stats",
+            required=False,
+            default=None,
+        ),
+    ):
         """Get the last few samples for this user to discord, with an option to delete"""
         logging.info("Getting session - Invoked by %s", ctx.author)
         if ctx.guild_id is None:
@@ -159,28 +198,46 @@ class BaseCommands(commands.Cog):
             user = ctx.user
 
         ids, lines = await self.db_handler.get_last(ctx.guild_id, 25, user.name)
-        min_time = datetime.now(tz=ZoneInfo("localtime")).replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+        min_time = (
+            datetime.now(tz=ZoneInfo("localtime"))
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .timestamp()
+        )
         lines = [l for l in lines if l[3] >= min_time]
 
         if len(lines) == 0:
-            await ctx.respond(content=":warning: No ratings found today!", ephemeral=True)
+            await ctx.respond(
+                content=":warning: No ratings found today!", ephemeral=True
+            )
         else:
             games_summary = self._format_lines(lines, skip_username=True)
             wins = sum([r == "win" for (_, _, r, _) in lines])
             losses = sum([r == "loss" for (_, _, r, _) in lines])
             games = len(lines)
-            emoji = '🥰' if wins - losses > 5 else '🥳' if wins > losses else '🥲' if losses - wins < 2 else '😭'
-            games_summary[0] = f"### Today: {emoji}\n-# Net Wins: **{wins - losses:+}** / Winrate: **{100 * wins / games:.0f}%** (played **{games}**, won **{wins}**)"
-
-            await ctx.respond(
-                content="\n".join(games_summary),
-                ephemeral=True
+            emoji = (
+                "🥰"
+                if wins - losses > 5
+                else "🥳"
+                if wins > losses
+                else "🥲"
+                if losses - wins < 2
+                else "😭"
+            )
+            games_summary[0] = (
+                f"### Today: {emoji}\n-# Net Wins: **{wins - losses:+}** / Winrate: **{100 * wins / games:.0f}%** (played **{games}**, won **{wins}**)"
             )
 
+            await ctx.respond(content="\n".join(games_summary), ephemeral=True)
+
     @slash_command(description="How does your map pick-rate compare to Rein maps?")
-    async def anti_rein(self, ctx: ApplicationContext,
-                        user: Option(discord.Member, description="Limit to a particular person", default=None),
-                        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON)):
+    async def anti_rein(
+        self,
+        ctx: ApplicationContext,
+        user: Option(
+            discord.Member, description="Limit to a particular person", default=None
+        ),
+        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON),
+    ):
         """Prints the last `n` pieces of data to discord, with option to delete"""
         logging.info("Getting anti-rein - Invoked by %s", ctx.author)
         await ctx.defer(ephemeral=True)
@@ -196,17 +253,22 @@ class BaseCommands(commands.Cog):
         if data.shape[0] == 0:
             await ctx.respond(
                 content=":warning: No matching data found - Cannot create graphs",
-                ephemeral=True
+                ephemeral=True,
             )
             raise ValueError("No data available")
 
         desc = {"Bad": -1, "Okay": 0, "Good": 2}
         all_rankings = [desc[r] for r in FIRE_RANKINGS.values()]
         expected_quality = sum(all_rankings) / len(all_rankings)
-        actual_quality = sum([desc[FIRE_RANKINGS[r["map"]]] for _, r in data.iterrows()]) / data.shape[0]
+        actual_quality = (
+            sum([desc[FIRE_RANKINGS[r["map"]]] for _, r in data.iterrows()])
+            / data.shape[0]
+        )
 
         # simulate it!
-        scores = np.random.choice(all_rankings, size=(50_000, data.shape[0])).mean(axis=1)
+        scores = np.random.choice(all_rankings, size=(50_000, data.shape[0])).mean(
+            axis=1
+        )
         scores.sort()
 
         z_score = (actual_quality - expected_quality) / scores.std()
@@ -224,11 +286,11 @@ class BaseCommands(commands.Cog):
 
         await ctx.respond(
             content=f"The Overwatch team {opinion} Reinhardt! (p={2 * (1 - NormalDist().cdf(abs(z_score))):.2f})"
-                    f"\n-# (assuming a uniform distribution for map selection as the baseline)"
-                    f"\n> Expected Quality: **{expected_quality:.2f}** *(n={data.shape[0]}, σ={scores.std():.3f})*"
-                    f"\n> Actual Quality: **{actual_quality:.2f}**"
-                    f"\n> Z-score: **{z_score:.2f}**",
-            ephemeral=True
+            f"\n-# (assuming a uniform distribution for map selection as the baseline)"
+            f"\n> Expected Quality: **{expected_quality:.2f}** *(n={data.shape[0]}, σ={scores.std():.3f})*"
+            f"\n> Actual Quality: **{actual_quality:.2f}**"
+            f"\n> Z-score: **{z_score:.2f}**",
+            ephemeral=True,
         )
 
     def _format_lines(self, lines: list, skip_username: bool = False):
@@ -236,12 +298,14 @@ class BaseCommands(commands.Cog):
         output = []
         if skip_username:
             output.append(f"Data for user `{lines[0][0]}`:")
-        for (username, map_name, result, datetime) in lines:
+        for username, map_name, result, datetime in lines:
             result_string = RESULTS_EMOJI[result]
 
             if skip_username:
                 output.append(f"{result_string} on *{map_name}* (<t:{datetime}:R>)")
             else:
-                output.append(f"`{username}`: {result_string} on *{map_name}* (<t:{datetime}:R>)")
+                output.append(
+                    f"`{username}`: {result_string} on *{map_name}* (<t:{datetime}:R>)"
+                )
 
         return output

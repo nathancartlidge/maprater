@@ -11,8 +11,10 @@ import pandas as pd
 from constants import SEASONS
 from queries import *
 
+
 class DatabaseHandler:
     """A class to manage SQLite databases per-server"""
+
     def __init__(self, root_dir: str = "") -> None:
         self.root_dir = root_dir
         self.tables = set()
@@ -26,12 +28,12 @@ class DatabaseHandler:
         async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
-            await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
+            await cursor.execute(SELECT_USERID_FROM_USERNAME, (username,))
             user_id = await cursor.fetchone()
 
             if user_id is None:
-                await cursor.execute(INSERT_INTO_USERS, (username, ))
-                await cursor.execute(SELECT_USERID_FROM_USERNAME, (username, ))
+                await cursor.execute(INSERT_INTO_USERS, (username,))
+                await cursor.execute(SELECT_USERID_FROM_USERNAME, (username,))
                 user_id = await cursor.fetchone()
                 await conn.commit()
 
@@ -42,12 +44,12 @@ class DatabaseHandler:
         async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
-            await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname, ))
+            await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname,))
             map_id = await cursor.fetchone()
 
             if map_id is None:
-                await cursor.execute(INSERT_INTO_MAPS, (mapname, ))
-                await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname, ))
+                await cursor.execute(INSERT_INTO_MAPS, (mapname,))
+                await cursor.execute(SELECT_MAPID_FROM_MAPNAME, (mapname,))
                 map_id = await cursor.fetchone()
                 await conn.commit()
 
@@ -72,8 +74,9 @@ class DatabaseHandler:
 
         self.tables.add(server_id)
 
-    async def write_line(self, server_id: int, username: str, mapname: str,
-                         result: str, datetime: float):
+    async def write_line(
+        self, server_id: int, username: str, mapname: str, result: str, datetime: float
+    ):
         """writes a map review to the database"""
         await self._ensure_tables_exist(server_id)
         map_id = await self._get_map_id(server_id, mapname)
@@ -82,13 +85,20 @@ class DatabaseHandler:
         async with aiosqlite.connect(self.get_db_name(server_id)) as conn:
             cursor = await conn.cursor()
 
-            await cursor.execute(INSERT_INTO_DATA, (user_id, map_id, result, int(datetime)))
+            await cursor.execute(
+                INSERT_INTO_DATA, (user_id, map_id, result, int(datetime))
+            )
 
             await cursor.close()
             await conn.commit()
 
-    async def get_last(self, server_id: int, count: int = 1, username: Optional[str] = None,
-                       map_name: Optional[str] = None) -> tuple[list, list]:
+    async def get_last(
+        self,
+        server_id: int,
+        count: int = 1,
+        username: Optional[str] = None,
+        map_name: Optional[str] = None,
+    ) -> tuple[list, list]:
         """
         gets the last line of data from the file, if present
         """
@@ -107,7 +117,13 @@ class DatabaseHandler:
             if username is not None:
                 if map_name is not None:
                     query = SELECT_LAST_N_USERNAME_MAP(count)
-                    await cursor.execute(query, (username, map_name,))
+                    await cursor.execute(
+                        query,
+                        (
+                            username,
+                            map_name,
+                        ),
+                    )
                 else:
                     query = SELECT_LAST_N_USERNAME(count)
                     await cursor.execute(query, (username,))
@@ -164,7 +180,11 @@ class DatabaseHandler:
 
         with sqlite3.connect(self.get_db_name(server_id)) as conn:
             if season and (season + 1 in SEASONS):
-                data = pd.read_sql_query(SELECT_ALL_PANDAS_SEASON, conn, params=[SEASONS[season], SEASONS[season + 1]])
+                data = pd.read_sql_query(
+                    SELECT_ALL_PANDAS_SEASON,
+                    conn,
+                    params=[SEASONS[season], SEASONS[season + 1]],
+                )
             else:
                 data = pd.read_sql_query(SELECT_ALL_PANDAS, conn)
 
