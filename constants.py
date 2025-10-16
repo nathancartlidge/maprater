@@ -110,6 +110,7 @@ class Seasons(Enum):
     Sixteen = 16
     Seventeen = 17
     Eighteen = 18
+    Nineteen = 19
     All = None
 
 
