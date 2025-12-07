@@ -6,10 +6,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiosqlite~=0.20.0",
+    "discord.py>=2.6.4",
     "matplotlib~=3.9.2",
     "numpy~=2.1.2",
     "pandas~=2.2.3",
-    "py-cord~=2.6.1",
     "python-dateutil~=2.8.2",
     "python-dotenv~=0.21.0",
     "requests~=2.32.3",

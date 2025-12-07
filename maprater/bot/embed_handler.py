@@ -1,17 +1,22 @@
 """Provides views - primarily for map voting"""
 
-from datetime import datetime
+from datetime import datetime, timezone
 import itertools
 import time
 import logging
-from zoneinfo import ZoneInfo
 
 import discord
 from discord import ButtonStyle
 from discord.interactions import Interaction
 
 from maprater.data.db_handler import DatabaseHandler
-from maprater.data.constants import DEFAULT_SEASON, MAPS, RESULTS_SCORES, MapType, RESULTS_EMOJI
+from maprater.data.constants import (
+    DEFAULT_SEASON,
+    MAPS,
+    RESULTS_SCORES,
+    MapType,
+    RESULTS_EMOJI,
+)
 from maprater.bot.plotting import PlotCommands
 
 
@@ -67,7 +72,7 @@ class MapButtons(discord.ui.View):
                 @discord.ui.button(
                     label=map_name, custom_id=map_name, row=i // 5, style=colour
                 )
-                async def func(self, _, interaction: Interaction, map_name=map_name):
+                async def func(self, interaction: Interaction, _, map_name=map_name):
                     return await self._callback(
                         map_name=map_name, interaction=interaction
                     )
@@ -89,35 +94,21 @@ class OW2Modes(MapButtons):
 BUTTON_MAPS = {"Overwatch 1 Modes": OW1Modes, "Overwatch 2 Modes": OW2Modes}
 
 
-class VotingButtons(discord.ui.View):
-    """Provides the initialised voting buttons"""
-
-    def __init__(self, voted_map, db_handler: DatabaseHandler):
-        super().__init__(timeout=1200)  # stay active for 20 minutes
+class VotingCore:
+    def __init__(self, voted_map: str, db_handler: DatabaseHandler):
         self.map = voted_map
         self.db_handler = db_handler
 
-    @discord.ui.button(label="win", style=ButtonStyle.green, row=0)
-    async def _win(self, _, interaction):
-        await self._submit(result="win", interaction=interaction)
+    async def _submit_edit(self, result: str, interaction: Interaction):
+        net_result, recent_results_emoji = await self._submit(result, interaction)
 
-    @discord.ui.button(label="wide win", style=ButtonStyle.grey, row=0)
-    async def _wide_win(self, _, interaction):
-        await self._submit(result="wide-win", interaction=interaction)
+        await interaction.response.edit_message(
+            content=f"**{result.title()}** on **{self.map}**\n"
+            f"-# Today: `{net_result:+}` {''.join(recent_results_emoji)}",
+            view=None,
+        )
 
-    @discord.ui.button(label="draw", style=ButtonStyle.grey, row=0)
-    async def _draw(self, _, interaction):
-        await self._submit(result="draw", interaction=interaction)
-
-    @discord.ui.button(label="wide loss", style=ButtonStyle.grey, row=0)
-    async def _wide_loss(self, _, interaction):
-        await self._submit(result="wide-loss", interaction=interaction)
-
-    @discord.ui.button(label="loss", style=ButtonStyle.red, row=0)
-    async def _loss(self, _, interaction):
-        await self._submit(result="loss", interaction=interaction)
-
-    async def _submit(self, result, interaction: Interaction):
+    async def _submit(self, result: str | int, interaction: Interaction):
         assert interaction.guild_id is not None
         logging.info("%s voted: %s on %s", interaction.user.name, result, self.map)
 
@@ -133,7 +124,7 @@ class VotingButtons(discord.ui.View):
             interaction.guild_id, 25, interaction.user.name
         )
         min_time = (
-            datetime.now(tz=ZoneInfo("localtime"))
+            datetime.now(tz=timezone.utc)
             .replace(hour=0, minute=0, second=0, microsecond=0)
             .timestamp()
         )
@@ -143,20 +134,51 @@ class VotingButtons(discord.ui.View):
             RESULTS_EMOJI[result] for _, _, result, _ in recent_results
         ]
         net_result = sum(RESULTS_SCORES[result] for _, _, result, _ in recent_results)
+        return net_result, recent_results_emoji
 
-        await interaction.response.edit_message(
-            content=f"**{result.title()}** on **{self.map}**\n"
-            f"-# Today: `{net_result:+}` {''.join(recent_results_emoji)}",
-            view=None,
+
+class VotingModal(discord.ui.Modal, VotingCore):
+    def __init__(self, voted_map: str, db_handler: DatabaseHandler, **kwargs):
+        VotingCore.__init__(self, voted_map, db_handler)
+        super().__init__(**kwargs, timeout=1200)
+        self.add_item(
+            discord.ui.InputText(label="Rank Change", required=True, placeholder="25%")
         )
 
+    async def callback(self, interaction: Interaction):
+        try:
+            percentage = int(self.children[0].value.strip(" %"))
+            await self._submit(result=percentage, interaction=interaction)
+        except ValueError:
+            await interaction.respond(":warning: Unable to parse SR change")
 
-class FakeContext:
-    def __init__(self, interaction: Interaction):
-        self.defer = interaction.response.defer
-        self.respond = interaction.respond
-        self.guild_id = interaction.guild_id
-        self.user = interaction.user
+
+class VotingButtons(discord.ui.View, VotingCore):
+    """Provides the initialised voting buttons"""
+
+    def __init__(self, voted_map, db_handler: DatabaseHandler):
+        super().__init__(timeout=1200)  # stay active for 20 minutes
+        VotingCore.__init__(self, voted_map, db_handler)
+
+    @discord.ui.button(label="win", style=ButtonStyle.green, row=0)
+    async def _win(self, interaction, _):
+        await self._submit_edit(result="win", interaction=interaction)
+
+    @discord.ui.button(label="wide win", style=ButtonStyle.grey, row=0)
+    async def _wide_win(self, interaction, _):
+        await self._submit_edit(result="wide-win", interaction=interaction)
+
+    @discord.ui.button(label="draw", style=ButtonStyle.grey, row=0)
+    async def _draw(self, interaction, _):
+        await self._submit_edit(result="draw", interaction=interaction)
+
+    @discord.ui.button(label="wide loss", style=ButtonStyle.grey, row=0)
+    async def _wide_loss(self, interaction, _):
+        await self._submit_edit(result="wide-loss", interaction=interaction)
+
+    @discord.ui.button(label="loss", style=ButtonStyle.red, row=0)
+    async def _loss(self, interaction, _):
+        await self._submit_edit(result="loss", interaction=interaction)
 
 
 class PlotButtons(discord.ui.View):
@@ -170,10 +192,10 @@ class PlotButtons(discord.ui.View):
     @discord.ui.button(
         label="Per-Map Winrate", custom_id="pmwr", style=ButtonStyle.blurple
     )
-    async def _pmwr(self, _, interaction: Interaction):
+    async def _pmwr(self, interaction: Interaction, _):
         await self.plot_commands.map_winrate.callback(
             self=self.plot_commands,
-            ctx=FakeContext(interaction),
+            interaction=interaction,
             user=interaction.user,
             rein_colours=False,
             season=DEFAULT_SEASON,
@@ -182,10 +204,10 @@ class PlotButtons(discord.ui.View):
     @discord.ui.button(
         label="Per-Map Play Count", custom_id="pmpc", style=ButtonStyle.blurple
     )
-    async def _pmpc(self, _, interaction: Interaction):
+    async def _pmpc(self, interaction: Interaction, _):
         await self.plot_commands.map_play_count.callback(
             self=self.plot_commands,
-            ctx=FakeContext(interaction),
+            interaction=interaction,
             user=interaction.user,
             win_loss=False,
             rein_colours=False,
@@ -193,30 +215,30 @@ class PlotButtons(discord.ui.View):
         )
 
     @discord.ui.button(label="Rolling Winrate", custom_id="rw", style=ButtonStyle.green)
-    async def _rw(self, _, interaction: Interaction):
+    async def _rw(self, interaction: Interaction, _):
         await self.plot_commands.winrate.callback(
             self=self.plot_commands,
-            ctx=FakeContext(interaction),
+            interaction=interaction,
             user=interaction.user,
             window_size=20,
             season=DEFAULT_SEASON,
         )
 
     @discord.ui.button(label="Relative Rank", custom_id="rr", style=ButtonStyle.green)
-    async def _rr(self, _, interaction: Interaction):
+    async def _rr(self, interaction: Interaction, _):
         await self.plot_commands.relative_rank.callback(
             self=self.plot_commands,
-            ctx=FakeContext(interaction),
+            interaction=interaction,
             user=interaction.user,
             real_dates=False,
             season=DEFAULT_SEASON,
         )
 
     @discord.ui.button(label="Streaks", custom_id="s", style=ButtonStyle.red)
-    async def _s(self, _, interaction: Interaction):
+    async def _s(self, interaction: Interaction, _):
         await self.plot_commands.streak.callback(
             self=self.plot_commands,
-            ctx=FakeContext(interaction),
+            interaction=interaction,
             user=interaction.user,
             keep_aspect=True,
             season=DEFAULT_SEASON,
@@ -241,8 +263,8 @@ class UndoLast(discord.ui.View):
             child.disabled = not can_delete  # type: ignore
 
     @discord.ui.button(label="Delete row(s)", style=ButtonStyle.red, disabled=True)
-    async def _undo(self, _, interaction: Interaction):
-        assert self.message is not None
+    async def _undo(self, interaction: Interaction, _):
+        assert interaction.message is not None
         assert interaction.guild_id is not None
 
         await self.db_handler.delete_ids(interaction.guild_id, self.ids)

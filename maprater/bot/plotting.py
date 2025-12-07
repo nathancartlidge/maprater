@@ -4,14 +4,14 @@ import logging
 from io import BytesIO
 
 import discord
+from discord import app_commands
+from discord.interactions import Interaction
 import matplotlib as mpl
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from discord import ApplicationContext
-from discord.commands import Option, slash_command
 from discord.ext import commands
 from matplotlib.ticker import MaxNLocator
 
@@ -44,47 +44,46 @@ class PlotCommands(commands.Cog):
 
     async def get_pandas(
         self,
-        ctx: ApplicationContext,
+        interaction: Interaction,
         user: discord.Member | None = None,
         season: int | None = None,
     ):
         # get data for this user
         logging.info("fetching data")
-        data = self.db_handler.get_pandas_data(ctx.guild_id, season=season)
+        data = self.db_handler.get_pandas_data(interaction.guild_id, season=season)
         if user is not None:
             data = data[data.author == user.name]
 
         if data.shape[0] == 0:
-            await ctx.respond(
+            await interaction.response.send_message(
                 content=":warning: No matching data found - Cannot create graphs",
                 ephemeral=True,
             )
             raise ValueError("No data available")
         return data
 
-    @slash_command(description="Winrate over time")
+    @app_commands.command(name="winrate", description="Winrate over time")
+    @app_commands.describe(
+        user="Limit data to a particular person",
+        window_size="Window size",
+        season="Overwatch Season",
+    )
     async def winrate(
         self,
-        ctx: ApplicationContext,
-        user: Option(
-            discord.Member,
-            description="Limit data to a particular person",
-            required=True,
-        ),
-        window_size: Option(
-            int, description="Window size", default=20, min_value=1, max_value=100
-        ),
-        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON),
+        interaction: Interaction,
+        user: discord.Member,
+        window_size: app_commands.Range[int, 1, 100] = 20,
+        season: Seasons = DEFAULT_SEASON,
     ):
         # support both forms of ctx
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
         # make the plot
-        data = await self.get_pandas(ctx, user, season.value)
+        data = await self.get_pandas(interaction, user, season.value)
         buffer = self.get_winrate_figure(data, window_size)
 
         logging.info("sending image")
-        await ctx.respond(
+        await interaction.followup.send(
             content=f"Rolling winrate for `{user.name}` (n={window_size})",
             files=[discord.File(fp=buffer, filename="winrate.png")],
             ephemeral=True,
@@ -145,28 +144,27 @@ class PlotCommands(commands.Cog):
 
         return buffer
 
-    @slash_command(description="Per-Map Winrate")
+    @app_commands.command(name="map_winrate", description="Per-Map Winrate")
+    @app_commands.describe(
+        user="Limit data to a particular person",
+        rein_colours="Colour by map quality for Reinhardt",
+        season="Overwatch Season",
+    )
     async def map_winrate(
         self,
-        ctx: ApplicationContext,
-        user: Option(
-            discord.Member,
-            description="Limit data to a particular person",
-            default=None,
-        ),
-        rein_colours: Option(
-            bool, description="Colour by map quality for Reinhardt", default=False
-        ),
-        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON),
+        interaction: Interaction,
+        user: discord.Member | None = None,
+        rein_colours: bool = False,
+        season: Seasons = DEFAULT_SEASON,
     ):
         # support both forms of ctx
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user, season.value)
+        data = await self.get_pandas(interaction, user, season.value)
         buffer = self.get_map_winrate_figure(data, rein_colours=rein_colours)
 
         logging.info("sending image")
-        await ctx.respond(
+        await interaction.followup.send(
             content=f"Normalised Per-Map Winrate for `{user.name}`"
             if user is not None
             else "Normalised Per-Map Winrate",
@@ -174,31 +172,31 @@ class PlotCommands(commands.Cog):
             ephemeral=True,
         )
 
-    @slash_command(description="Per-Map Play Count")
+    @app_commands.command(name="map_play_count", description="Per-Map Play Count")
+    @app_commands.describe(
+        user="Limit to a particular person",
+        win_loss="Cumulative wins and losses per-map",
+        rein_colours="Colour by map quality for Reinhardt",
+        season="Overwatch Season",
+    )
     async def map_play_count(
         self,
-        ctx: ApplicationContext,
-        user: Option(
-            discord.Member, description="Limit to a particular person", default=None
-        ),
-        win_loss: Option(
-            bool, description="Cumulative wins and losses per-map", default=False
-        ),
-        rein_colours: Option(
-            bool, description="Colour by map quality for Reinhardt", default=False
-        ),
-        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON),
+        interaction: Interaction,
+        user: discord.Member | None = None,
+        win_loss: bool = False,
+        rein_colours: bool = False,
+        season: Seasons = DEFAULT_SEASON,
     ):
         # support both forms of ctx
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user, season.value)
+        data = await self.get_pandas(interaction, user, season.value)
         buffer = self.get_map_winrate_figure(
             data, count_only=True, win_loss=win_loss, rein_colours=rein_colours
         )
 
         logging.info("sending image")
-        await ctx.respond(
+        await interaction.followup.send(
             content=("Per-Map " + "Net Wins" if win_loss else "Play Count")
             + f" for `{user.name}`"
             if user is not None
@@ -207,18 +205,23 @@ class PlotCommands(commands.Cog):
             ephemeral=True,
         )
 
-    @slash_command(description="Cumulative Wins")
+    @app_commands.command(name="relative_rank", description="Cumulative Wins")
+    @app_commands.describe(
+        user="Limit to a particular person",
+        real_dates="Use real dates",
+        season="Overwatch Season",
+    )
     async def relative_rank(
         self,
-        ctx: ApplicationContext,
-        user: Option(discord.Member, description="Limit to a particular person"),
-        real_dates: Option(bool, description="Use real dates", default=False),
-        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON),
+        interaction: Interaction,
+        user: discord.Member,
+        real_dates: bool = False,
+        season: Seasons = DEFAULT_SEASON,
     ):
         # support both forms of ctx
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user, season.value)
+        data = await self.get_pandas(interaction, user, season.value)
 
         # make the plot
         data["winloss-net"] = data["winloss"].replace(RESULTS_SCORES)
@@ -317,26 +320,29 @@ class PlotCommands(commands.Cog):
         buffer = self._export_figure(fig)
 
         logging.info("sending image")
-        await ctx.respond(
+        await interaction.followup.send(
             content="Relative Rank" + f" for `{user.name}`" if user is not None else "",
             files=[discord.File(fp=buffer, filename="map_count.png")],
             ephemeral=True,
         )
 
-    @slash_command(description="Win streaks")
+    @app_commands.command(name="streak", description="Win streaks")
+    @app_commands.describe(
+        user="Limit to a particular person",
+        keep_aspect="Maintain aspect ratio in plot",
+        season="Overwatch Season",
+    )
     async def streak(
         self,
-        ctx: ApplicationContext,
-        user: Option(discord.Member, description="Limit to a particular person"),
-        keep_aspect: Option(
-            bool, description="Maintain aspect ratio in plot", default=True
-        ),
-        season: Option(Seasons, description="Overwatch Season", default=DEFAULT_SEASON),
+        interaction: Interaction,
+        user: discord.Member,
+        keep_aspect: bool = True,
+        season: Seasons = DEFAULT_SEASON,
     ):
         # support both forms of ctx
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
-        data = await self.get_pandas(ctx, user, season.value)
+        data = await self.get_pandas(interaction, user, season.value)
 
         # slightly fancy algorithm to make the shape: we want triangles not lines!
         i = 0
@@ -407,7 +413,7 @@ class PlotCommands(commands.Cog):
         buffer = self._export_figure(fig)
         logging.info("sending image")
 
-        await ctx.respond(
+        await interaction.followup.send(
             content=f"Win-streak for `{user.name}`\n"
             f"-# 🏆 Longest win streak: **{best_streak} games**\n"
             f"-# ❌ Longest loss streak: **{abs(worst_streak)} games**",

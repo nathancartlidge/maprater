@@ -1,9 +1,5 @@
-import logging
-
-import discord
-from discord import ApplicationContext
-from discord.commands import Option
 from discord.interactions import Interaction
+from discord.ext import commands
 
 from maprater.data.db_handler import DatabaseHandler
 
@@ -13,58 +9,57 @@ ALIGNMENT_UPDATE = (
 )
 
 
-class UpdateCommand(discord.Cog):
+class UpdateCommand(commands.Cog):
     """Function to provide Rank Update Handling"""
 
     def __init__(self, db_handler: DatabaseHandler) -> None:
         super().__init__()
         self.db_handler = db_handler
 
-    # @slash_command(description="Rank update information")
-    async def rank_update(
-        self,
-        ctx: ApplicationContext,
-        role: Option(
-            str,
-            description="The role to update",
-            choices=["Tank", "Damage", "Support"],
-            required=True,
-        ),
-        reset: Option(
-            bool,
-            description="Force a rank update?",
-            choices=[True, False],
-            default=False,
-        ),
-    ):
-        """A manual rank update"""
-        if reset:
-            logging.info("Forcing a rank update on %s for %s", role, ctx.user)
-
-        role_char = {"Tank": "t", "Damage": "d", "Support": "s"}[role]
-
-        if ctx.guild_id is None:
-            await ctx.respond(":warning: This bot does not support DMs")
-            return
-
-        _, string = await self.db_handler.do_rank_update(
-            ctx.guild_id, str(ctx.user), role_char, force=reset
-        )
-        if string is None:
-            if reset:
-                await ctx.respond(
-                    f"Rank Update tracking enabled for {role}!", ephemeral=True
-                )
-            else:
-                await ctx.respond(
-                    f"No known rank update for {role} - have you started tracking?",
-                    ephemeral=True,
-                )
-        else:
-            string = UpdateCommand.format_update(role_char, string, reset)
-            if reset:
-                string += "\n> please rank all your games!"
-            await ctx.respond(string, ephemeral=True)
+    # @app_commands.command(name="rank_update", description="Rank update information")
+    # @app_commands.describe(
+    #     role="The role to update",
+    #     reset="Force a rank update?",
+    # )
+    # @app_commands.choices(role=[
+    #     app_commands.Choice(name="Tank", value="Tank"),
+    #     app_commands.Choice(name="Damage", value="Damage"),
+    #     app_commands.Choice(name="Support", value="Support"),
+    # ])
+    # async def rank_update(
+    #     self,
+    #     interaction: Interaction,
+    #     role: str,
+    #     reset: bool = False,
+    # ):
+    #     """A manual rank update"""
+    #     if reset:
+    #         logging.info("Forcing a rank update on %s for %s", role, interaction.user)
+    #
+    #     role_char = {"Tank": "t", "Damage": "d", "Support": "s"}[role]
+    #
+    #     if interaction.guild_id is None:
+    #         await interaction.response.send_message(":warning: This bot does not support DMs")
+    #         return
+    #
+    #     _, string = await self.db_handler.do_rank_update(
+    #         interaction.guild_id, str(interaction.user), role_char, force=reset
+    #     )
+    #     if string is None:
+    #         if reset:
+    #             await interaction.response.send_message(
+    #                 f"Rank Update tracking enabled for {role}!", ephemeral=True
+    #             )
+    #         else:
+    #             await interaction.response.send_message(
+    #                 f"No known rank update for {role} - have you started tracking?",
+    #                 ephemeral=True,
+    #             )
+    #     else:
+    #         string = UpdateCommand.format_update(role_char, string, reset)
+    #         if reset:
+    #             string += "\n> please rank all your games!"
+    #         await interaction.response.send_message(string, ephemeral=True)
 
     @staticmethod
     def format_update(role: str, result: str, is_final: bool = False):

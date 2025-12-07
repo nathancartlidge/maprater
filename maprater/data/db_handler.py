@@ -15,13 +15,14 @@ from maprater.data.queries import *
 class DatabaseHandler:
     """A class to manage SQLite databases per-server"""
 
-    def __init__(self, root_dir: str = "") -> None:
+    def __init__(self, root_dir: str | Path = "") -> None:
         self.root_dir = root_dir
         self.tables = set()
 
-    def get_db_name(self, server_id: int):
-        assert (Path(self.root_dir) / f"{server_id}-v2.db").resolve().exists()
-        return f"{self.root_dir}{server_id}-v2.db"
+    def get_db_name(self, server_id: int) -> Path:
+        assert self.root_dir.is_dir()
+        db_path = Path(self.root_dir) / f"{server_id}-v2.db"
+        return db_path
 
     async def _get_user_id(self, server_id: int, username: str):
         """Gets a user ID from a map name, inserting if not present"""

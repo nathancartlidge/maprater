@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import discord
-from discord import ApplicationContext
-from discord.commands import Option, slash_command
+from discord import app_commands
+from discord.interactions import Interaction
 from discord.ext import commands
 
 # manually calculated with some trial and error
@@ -328,37 +328,38 @@ class OcrCog(commands.Cog):
         except ValueError:
             return None
 
-    @slash_command(description="use OCR to detect team stats")
+    @app_commands.command(name="scoreboard", description="use OCR to detect team stats")
+    @app_commands.describe(
+        file="The scoreboard to OCR",
+        show_scoreboard="show the parsed scoreboard",
+    )
     async def scoreboard(
         self,
-        ctx: ApplicationContext,
-        file: Option(
-            discord.Attachment, description="The scoreboard to OCR", required=True
-        ),
-        show_scoreboard: Option(
-            bool,
-            description="show the parsed scoreboard",
-            required=False,
-            default=False,
-        ),
+        interaction: Interaction,
+        file: discord.Attachment,
+        show_scoreboard: bool = False,
     ):
         """Read a scoreboard using OCR, show some basic stats"""
-        logging.info("OCR - Invoked by %s", ctx.author)
-        if ctx.guild_id is None:
-            await ctx.respond(":warning: This bot does not support DMs")
+        logging.info("OCR - Invoked by %s", interaction.user)
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                ":warning: This bot does not support DMs"
+            )
             return
 
         assert isinstance(file, discord.Attachment)
 
         if "image" not in file.content_type:
-            await ctx.respond(content=":warning: Bad attachment type", ephemeral=True)
+            await interaction.response.send_message(
+                content=":warning: Bad attachment type", ephemeral=True
+            )
             raise ValueError("Bad attachment")
 
-        await ctx.defer(ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
 
         img = self.download_file(file.url)
         if img is None:
-            await ctx.respond(
+            await interaction.followup.send(
                 content=":warning: Unable to download attachment", ephemeral=True
             )
             raise IOError("Unable to download attachment")
@@ -370,7 +371,9 @@ class OcrCog(commands.Cog):
             blue_scoreboard = read_scoreboard(blue_team, self.templates)
             red_scoreboard = read_scoreboard(red_team, self.templates)
         except:
-            await ctx.respond(content=":warning: Unable to parse image", ephemeral=True)
+            await interaction.followup.send(
+                content=":warning: Unable to parse image", ephemeral=True
+            )
             return
 
         logging.info("calculating stats...")
@@ -384,16 +387,16 @@ class OcrCog(commands.Cog):
                 "(also stats are kinda meaningless so don't over-index on them)"
             )
             if show_scoreboard:
-                await ctx.respond(
+                await interaction.followup.send(
                     content=stats[:-2] + f"\n\n```{data}```\n{disclaimer}",
                     ephemeral=True,
                 )
             else:
-                await ctx.respond(
+                await interaction.followup.send(
                     content=stats[:-2] + "\n\n" + disclaimer, ephemeral=True
                 )
         else:
-            await ctx.respond(
+            await interaction.followup.send(
                 content=f":warning: Failed to compute stats from data: unfortunately, this bot does not yet support "
                 f"in-match screenshots or weird colours\n\nBest attempt:```\n{data}```",
                 ephemeral=True,
