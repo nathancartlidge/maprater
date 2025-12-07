@@ -10,9 +10,9 @@ import discord
 from discord import ButtonStyle
 from discord.interactions import Interaction
 
-from db_handler import DatabaseHandler
-from constants import DEFAULT_SEASON, MAPS, RESULTS_SCORES, MapType, RESULTS_EMOJI
-from plotting import PlotCommands
+from maprater.data.db_handler import DatabaseHandler
+from maprater.data.constants import DEFAULT_SEASON, MAPS, RESULTS_SCORES, MapType, RESULTS_EMOJI
+from maprater.bot.plotting import PlotCommands
 
 
 class MapButtons(discord.ui.View):

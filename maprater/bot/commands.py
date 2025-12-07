@@ -12,7 +12,7 @@ from discord import ApplicationContext
 from discord.commands import Option, slash_command
 from discord.ext import commands
 
-from constants import (
+from maprater.data.constants import (
     FIRE_RANKINGS,
     DEFAULT_SEASON,
     MAP_TYPES,
@@ -21,8 +21,8 @@ from constants import (
     RESULTS_EMOJI,
     Seasons,
 )
-from embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
-from db_handler import DatabaseHandler
+from maprater.bot.embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
+from maprater.data.db_handler import DatabaseHandler
 
 
 class BaseCommands(commands.Cog):

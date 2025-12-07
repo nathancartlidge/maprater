@@ -7,14 +7,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from bot import MapRater
-from commands import BaseCommands
-from ocr_utils import OcrCog
-from plotting import PlotCommands
-from rank_update import UpdateCommand
-from db_handler import DatabaseHandler
+from maprater.bot.core import MapRater
+from maprater.bot.commands import BaseCommands
+# from maprater.archive.ocr_utils import OcrCog
+from maprater.bot.plotting import PlotCommands
+from maprater.archive.rank_update import UpdateCommand
+from maprater.data.db_handler import DatabaseHandler
 
-if __name__ == "__main__":
+def run_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--debug", action="store_true", default=False)
     parser.add_argument("-v", "--verbose", action="store_true", default=False)
@@ -68,6 +68,9 @@ if __name__ == "__main__":
     bot.add_cog(BaseCommands(bot.db_handler))
     bot.add_cog(PlotCommands(bot.db_handler))
     bot.add_cog(UpdateCommand(bot.db_handler))
-    bot.add_cog(OcrCog(data_loc))
+    # bot.add_cog(OcrCog(data_loc))
 
     bot.run(TOKEN)
+
+if __name__ == "__main__":
+    run_args()

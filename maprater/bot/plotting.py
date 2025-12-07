@@ -15,7 +15,7 @@ from discord.commands import Option, slash_command
 from discord.ext import commands
 from matplotlib.ticker import MaxNLocator
 
-from constants import (
+from maprater.data.constants import (
     FIRE_RANKINGS,
     DEFAULT_SEASON,
     MAPS_LIST,
@@ -26,7 +26,7 @@ from constants import (
     Seasons,
     SEASONS,
 )
-from db_handler import DatabaseHandler
+from maprater.data.db_handler import DatabaseHandler
 
 mpl.use("agg")  # force non-interactive backend
 mpl.rcParams["axes.xmargin"] = 0  # tight x axes

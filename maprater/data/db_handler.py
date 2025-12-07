@@ -8,8 +8,8 @@ import sqlite3
 import aiosqlite
 import pandas as pd
 
-from constants import SEASONS
-from queries import *
+from maprater.data.constants import SEASONS
+from maprater.data.queries import *
 
 
 class DatabaseHandler:

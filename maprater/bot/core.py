@@ -1,7 +1,7 @@
 import discord
 import logging
 
-from embed_handler import BUTTON_MAPS, PlotButtons
+from maprater.bot.embed_handler import BUTTON_MAPS, PlotButtons
 
 
 class MapRater(discord.Bot):

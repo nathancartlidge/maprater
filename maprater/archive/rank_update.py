@@ -5,7 +5,7 @@ from discord import ApplicationContext
 from discord.commands import Option
 from discord.interactions import Interaction
 
-from db_handler import DatabaseHandler
+from maprater.data.db_handler import DatabaseHandler
 
 ALIGNMENT_UPDATE = (
     "\n> have you **not** just had an update? run the command"
