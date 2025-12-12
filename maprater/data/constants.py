@@ -1,5 +1,7 @@
 from enum import Enum
 
+from typing_extensions import NamedTuple
+
 
 class MapType(Enum):
     CONTROL = 0
@@ -99,7 +101,8 @@ SEASONS = {
     17: "2025-06-24T19:00:00",
     18: "2025-08-26T19:00:00",
     19: "2025-10-14T19:00:00",
-    20: "2026-12-31T23:59:59",
+    20: "2025-12-09T19:00:00",
+    21: "2026-12-31T23:59:59",
 }
 
 
@@ -111,6 +114,7 @@ class Seasons(Enum):
     Seventeen = 17
     Eighteen = 18
     Nineteen = 19
+    Twenty = 20
     All = None
 
 
@@ -149,3 +153,39 @@ FIRE_RANKINGS = {
     "Anubis": "Okay",
     "Aatlis": "Okay",
 }
+
+
+class Ranks(Enum):
+    BRONZE = 0
+    SILVER = 1
+    GOLD = 2
+    PLAT = 3
+    DIAMOND = 4
+    MASTERS = 5
+    GM = 6
+    CHAMP = 7
+
+
+RANK_EMOJI = {
+    Ranks.BRONZE: "<:bronze:1448043323800555631>",
+    Ranks.SILVER: "<:silver:1448043196067221676>",
+    Ranks.GOLD: "<:gold:1448043378393612329>",
+    Ranks.PLAT: "<:plat:1448043225548984320>",
+    Ranks.DIAMOND: "<:diamond:1448043147497177178>",
+    Ranks.MASTERS: "<:master:1448043072486248620>",
+    Ranks.GM: "<:gm:1448043106577416283>",
+    Ranks.CHAMP: "<:champ:1448043261137522748>",
+}
+
+
+class FullRank(NamedTuple):
+    rank: Ranks
+    division: int
+    percentage: int
+
+    @property
+    def emoji(self) -> str:
+        return RANK_EMOJI[self.rank]
+
+    def __str__(self):
+        return f"{self.emoji} **{self.division}** @ {self.percentage}%"

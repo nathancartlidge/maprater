@@ -19,8 +19,15 @@ from maprater.data.constants import (
     MapType,
     RESULTS_EMOJI,
     Seasons,
+    Ranks,
+    RANK_EMOJI,
 )
-from maprater.bot.embed_handler import BUTTON_MAPS, PlotButtons, UndoLast
+from maprater.bot.embed_handler import (
+    PlotButtons,
+    UndoLast,
+    OW1Modes,
+    OW2Modes,
+)
 from maprater.data.db_handler import DatabaseHandler
 
 
@@ -43,11 +50,12 @@ class BaseCommands(commands.Cog):
             return
 
         logging.info("Created buttons - Invoked by %s", interaction.user)
-        for map_types, cls in BUTTON_MAPS.items():
-            await interaction.response.send_message(
-                content=f"### {map_types}", view=cls(self.db_handler)
-            )
-
+        await interaction.response.send_message(
+            content="### Overwatch 1 Modes", view=OW1Modes(self.db_handler)
+        )
+        await interaction.followup.send(
+            content="### Overwatch 2 Modes", view=OW2Modes(self.db_handler)
+        )
         await interaction.followup.send(
             content="### Plot Commands", view=PlotButtons(self.db_handler)
         )
@@ -239,6 +247,62 @@ class BaseCommands(commands.Cog):
             await interaction.response.send_message(
                 content="\n".join(games_summary), ephemeral=True
             )
+
+    @app_commands.command(
+        name="set_rank", description="Set your rank (for SR tracking)"
+    )
+    @app_commands.describe(
+        rank="Rank",
+        division="Division within your rank",
+        percentage="Percentage within your division",
+    )
+    @app_commands.choices(
+        rank=[app_commands.Choice(name=rank.name, value=rank.value) for rank in Ranks],
+        division=[app_commands.Choice(name=str(i), value=i) for i in range(1, 6)],
+    )
+    async def set_rank(
+        self, interaction: Interaction, rank: int, division: int, percentage: int
+    ):
+        try:
+            rank_enum = Ranks(rank)
+            assert 0 < division <= 5
+            assert 0 <= percentage < 100
+        except (AssertionError, ValueError):
+            await interaction.response.send_message(
+                ":warning: Invalid rank, unable to set", ephemeral=True
+            )
+            return
+
+        await self.db_handler.set_rank(
+            server_id=interaction.guild_id,
+            username=interaction.user.name,
+            rank=rank_enum,
+            division=division,
+            percentage=percentage,
+        )
+
+        await interaction.response.send_message(
+            f"Your rank is now {RANK_EMOJI[rank_enum]} **{division}** @ {percentage}%",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="get_rank", description="Get your current rank")
+    @app_commands.describe(user="Limit to a particular person")
+    async def get_rank(
+        self, interaction: Interaction, user: discord.Member | None = None
+    ):
+        if user is None:
+            user = interaction.user
+        rank = await self.db_handler.get_rank(interaction.guild_id, user.name)
+        if rank is None:
+            await interaction.response.send_message(
+                ":warning: No rank found", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            f"`{user.name}` is at {rank}",
+            ephemeral=True,
+        )
 
     @app_commands.command(
         name="anti_rein",

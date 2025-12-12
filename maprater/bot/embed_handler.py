@@ -2,7 +2,6 @@
 
 from datetime import datetime, timezone
 import itertools
-import time
 import logging
 
 import discord
@@ -16,6 +15,7 @@ from maprater.data.constants import (
     RESULTS_SCORES,
     MapType,
     RESULTS_EMOJI,
+    FullRank,
 )
 from maprater.bot.plotting import PlotCommands
 
@@ -23,7 +23,7 @@ from maprater.bot.plotting import PlotCommands
 class MapButtons(discord.ui.View):
     """Persistent map rating buttons"""
 
-    MAP_TYPES = None
+    MAP_TYPES: list[MapType | None] = None
 
     def __init__(self, db_handler: DatabaseHandler):
         self.db_handler = db_handler
@@ -50,10 +50,18 @@ class MapButtons(discord.ui.View):
         past_results_emoji = [
             RESULTS_EMOJI[result] for _, _, result, _ in past_results[:20]
         ]
-        text = f"**{map_name}**\n-# Normalised Winrate: `{winrate:.1f}%`\n-# Past Results: {''.join(past_results_emoji)}\n"
+        map_info = f"-# Normalised Winrate: `{winrate:.1f}%`\n-# Past Results: {''.join(past_results_emoji)}\n"
 
-        await interaction.response.send_message(
-            content=text, view=VotingButtons(map_name, self.db_handler), ephemeral=True
+        # await interaction.response.send_message(
+        #     content=text, view=VotingButtons(map_name, self.db_handler), ephemeral=True
+        # )
+        current_rank = await self.db_handler.get_rank(
+            interaction.guild_id, interaction.user.name
+        )
+        await interaction.response.send_modal(
+            VotingModal(
+                map_name, self.db_handler, map_info=map_info, current_rank=current_rank
+            )
         )
 
     def make_buttons(self):
@@ -65,8 +73,11 @@ class MapButtons(discord.ui.View):
             [ButtonStyle.red, ButtonStyle.green, ButtonStyle.blurple, ButtonStyle.grey]
         )
         for map_type in self.MAP_TYPES:
-            map_names = sorted(MAPS[map_type])
             colour = next(colours)
+            if map_type is None:
+                continue
+
+            map_names = sorted(MAPS[map_type])
             for map_name in map_names:
 
                 @discord.ui.button(
@@ -88,7 +99,7 @@ class OW1Modes(MapButtons):
 
 
 class OW2Modes(MapButtons):
-    MAP_TYPES = (MapType.PUSH, MapType.FLASHPOINT, MapType.CLASH)
+    MAP_TYPES = (MapType.PUSH, MapType.FLASHPOINT, None, MapType.CLASH)
 
 
 BUTTON_MAPS = {"Overwatch 1 Modes": OW1Modes, "Overwatch 2 Modes": OW2Modes}
@@ -108,6 +119,28 @@ class VotingCore:
             view=None,
         )
 
+    async def _submit_post(self, result: int | str, interaction: Interaction):
+        net_result, recent_results_emoji = await self._submit(result, interaction)
+
+        if isinstance(result, int):
+            result_text = "Win" if result > 0 else "Draw" if result == 0 else "Loss"
+        else:
+            result_text = result.title()
+
+        rank = await self.db_handler.get_rank(
+            interaction.guild_id, interaction.user.name
+        )
+        if rank is not None:
+            rank_text = f"{rank}\n"
+        else:
+            rank_text = ""
+
+        await interaction.response.send_message(
+            content=f"**{result_text}** on **{self.map}**\n{rank_text}"
+            f"-# Today: `{net_result:+}` {''.join(recent_results_emoji)}\n",
+            ephemeral=True,
+        )
+
     async def _submit(self, result: str | int, interaction: Interaction):
         assert interaction.guild_id is not None
         logging.info("%s voted: %s on %s", interaction.user.name, result, self.map)
@@ -117,8 +150,13 @@ class VotingCore:
             username=interaction.user.name,
             mapname=self.map,
             result=result,
-            datetime=time.time(),
+            timestamp=datetime.now(tz=timezone.utc).timestamp(),
         )
+        if isinstance(result, int):
+            # update rank
+            await self.db_handler.update_rank(
+                interaction.guild_id, interaction.user.name, result
+            )
 
         _, results = await self.db_handler.get_last(
             interaction.guild_id, 25, interaction.user.name
@@ -138,19 +176,49 @@ class VotingCore:
 
 
 class VotingModal(discord.ui.Modal, VotingCore):
-    def __init__(self, voted_map: str, db_handler: DatabaseHandler, **kwargs):
+    def __init__(
+        self,
+        voted_map: str,
+        db_handler: DatabaseHandler,
+        map_info: str,
+        current_rank: FullRank | None,
+        **kwargs,
+    ):
         VotingCore.__init__(self, voted_map, db_handler)
-        super().__init__(**kwargs, timeout=1200)
+        super().__init__(**kwargs, title=voted_map, timeout=1200)
         self.add_item(
-            discord.ui.InputText(label="Rank Change", required=True, placeholder="25%")
+            discord.ui.TextDisplay(
+                content="*Enter the percentage SR change, or `w`/`l`/`d` for win/loss/draw*"
+            )
         )
 
-    async def callback(self, interaction: Interaction):
-        try:
-            percentage = int(self.children[0].value.strip(" %"))
-            await self._submit(result=percentage, interaction=interaction)
-        except ValueError:
-            await interaction.respond(":warning: Unable to parse SR change")
+        self.add_item(discord.ui.TextDisplay(content=map_info))
+
+        if current_rank is not None:
+            self.add_item(
+                discord.ui.TextDisplay(
+                    content=f"-# I think you are currently {current_rank}"
+                )
+            )
+        self.add_item(
+            discord.ui.TextInput(
+                label="Rank Change", required=True, placeholder="25%", id=0
+            )
+        )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        result_raw: str = self.find_item(0).value.strip(" %")
+        if result_raw.isnumeric():
+            await self._submit_post(result=int(result_raw), interaction=interaction)
+        elif result_raw and result_raw.lower()[0] in ("w", "l", "d"):
+            result_string = {"w": "win", "l": "loss", "d": "draw"}[
+                result_raw.lower()[0]
+            ]
+            await self._submit_post(result=result_string, interaction=interaction)
+        else:
+            await interaction.response.send_message(
+                ":warning: Unable to parse SR change", ephemeral=True
+            )
 
 
 class VotingButtons(discord.ui.View, VotingCore):

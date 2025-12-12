@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS ow2 (
     author_id INTEGER NOT NULL,
     map_id    INTEGER NOT NULL,
     result    STRING NOT NULL,
+    rank_change INTEGER,
     -- role      CHAR(1) NOT NULL,
     -- sentiment INTEGER NOT NULL,
     datetime  INTEGER NOT NULL,
@@ -28,6 +29,19 @@ CREATE TABLE IF NOT EXISTS ow2 (
             ON UPDATE NO ACTION,
     FOREIGN KEY (map_id)
         REFERENCES maps (map_id)
+            ON DELETE CASCADE
+            ON UPDATE NO ACTION
+)
+"""
+
+CREATE_RANK_TABLE = """
+CREATE TABLE IF NOT EXISTS ranks (
+    user_id INTEGER PRIMARY KEY,
+    rank INTEGER NOT NULL,
+    set_time DATETIME NOT NULL,
+    
+    FOREIGN KEY (user_id)
+        REFERENCES users (user_id)
             ON DELETE CASCADE
             ON UPDATE NO ACTION
 )
@@ -56,6 +70,14 @@ SELECT users.username as author, maps.map_name as map, ow2.result as winloss, da
         INNER JOIN maps ON ow2.map_id = maps.map_id
     WHERE ow2.datetime >= unixepoch(?)
       AND ow2.datetime < unixepoch(?)
+"""
+
+
+SELECT_BY_ID = """
+SELECT ow2.author_id, users.username, ow2.rank_change, ow2.datetime
+    FROM ow2
+    INNER JOIN users on ow2.author_id = users.user_id
+    WHERE ow2.rating_id = @id
 """
 
 
@@ -113,8 +135,8 @@ def DELETE_N_IDS(n: int):
 
 INSERT_INTO_DATA = """
 INSERT INTO ow2
-    (author_id, map_id, result, datetime)
-    VALUES (?, ?, ?, ?)
+    (author_id, map_id, result, rank_change, datetime)
+    VALUES (?, ?, ?, ?, ?)
 """
 INSERT_INTO_USERS = "INSERT INTO users (username) values (?)"
 INSERT_INTO_MAPS = "INSERT INTO maps (map_name) values (?)"
@@ -125,3 +147,20 @@ INSERT_INTO_MAPS = "INSERT INTO maps (map_name) values (?)"
 #     ON CONFLICT(user_id, role)
 #     DO UPDATE SET rating_id=?;
 # """
+
+GET_RANK = """
+SELECT ranks.rank, ranks.set_time FROM ranks
+    INNER JOIN users ON ranks.user_id = users.user_id
+    WHERE users.username = @username
+"""
+SET_RANK = """
+INSERT INTO ranks (user_id, rank, set_time)
+    VALUES (@user_id, @rank, @set_time)
+    ON CONFLICT(user_id) DO UPDATE
+        SET rank = @rank, set_time = @set_time
+"""
+UPDATE_RANK = """
+UPDATE ranks
+    SET rank = @rank
+    WHERE @user_id = user_id
+"""
